@@ -150,6 +150,7 @@ export default function BTCSwingAnalyzer() {
         >
           Bitcoin Swing<br />
           <span style={{ color: '#38bdf8' }}>Strategy Scanner</span>
+          <span style={{ fontSize: 12, background: 'red', color: 'white', padding: '2px 8px', marginLeft: 12, borderRadius: 4, verticalAlign: 'middle' }}>v2</span>
         </h1>
       </header>
 
