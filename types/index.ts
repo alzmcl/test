@@ -68,6 +68,23 @@ export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
   portfolioSize: 10000,
 };
 
+/**
+ * Range Mode: buy on small dips, sell after 5% gain (trailing), re-enter on 5% pullback.
+ * Designed for sideways / choppy markets where price oscillates in a range.
+ */
+export const RANGE_MODE_CONFIG: Omit<BacktestConfig, 'portfolioSize'> = {
+  entryDipPct: 0.03,
+  trailingStopActivationPct: 0.05,
+  trailingStopPct: 0.035,
+  reEntryDipPct: 0.05,
+  reEntryCooldownBars: 1,
+  regimeFilter: false,
+  lookbackDays: 7,
+  feePct: 0.001,
+  regimeAdxPeriod: 14,
+  regimeAdxThreshold: 25,
+};
+
 export type TradeSide = 'buy' | 'sell';
 export type TradeReason = 'entry_dip' | 'trailing_stop' | 'end_of_data' | 're_entry_dip';
 

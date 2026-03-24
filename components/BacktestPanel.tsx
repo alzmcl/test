@@ -1,6 +1,7 @@
 'use client';
 
 import type { BacktestConfig, BacktestResult } from '@/types';
+import { DEFAULT_BACKTEST_CONFIG, RANGE_MODE_CONFIG } from '@/types';
 import { formatPrice } from '@/lib/btcPrice';
 
 interface Props {
@@ -64,9 +65,26 @@ export default function BacktestPanel({ result, config, onConfigChange }: Props)
           className="px-5 py-4 border-b flex items-center justify-between"
           style={{ borderColor: '#0f172a' }}
         >
-          <span className="text-sm font-semibold" style={{ color: '#94a3b8' }}>
-            Backtester
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold" style={{ color: '#94a3b8' }}>
+              Backtester
+            </span>
+            <div className="flex gap-1">
+              {([
+                ['Default', DEFAULT_BACKTEST_CONFIG, '#334155', '#64748b'],
+                ['Range', RANGE_MODE_CONFIG,          '#0c2a3a', '#38bdf8'],
+              ] as [string, Partial<BacktestConfig>, string, string][]).map(([label, preset, bg, fg]) => (
+                <button
+                  key={label}
+                  onClick={() => onConfigChange({ ...config, ...preset })}
+                  className="text-xs font-mono px-2 py-0.5 rounded transition-colors"
+                  style={{ background: bg, color: fg, border: `1px solid ${fg}33` }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <label className="flex items-center gap-2 cursor-pointer">
             <span className="text-xs font-mono" style={{ color: '#475569' }}>Regime filter</span>
             <div
