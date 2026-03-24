@@ -137,7 +137,7 @@ export default function BTCSwingAnalyzer() {
               color: '#94a3b8',
             }}
           >
-            {[90, 180, 270, 365].map((d) => (
+            {[90, 180, 270, 365, 730].map((d) => (
               <option key={d} value={d}>
                 {d}d
               </option>
@@ -256,6 +256,7 @@ export default function BTCSwingAnalyzer() {
               config={config}
               onConfigApply={(c) => {
                 setConfig(c);
+                setDays(730);
                 setActiveTab('chart');
               }}
             />

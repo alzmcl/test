@@ -180,16 +180,14 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
 
     // Always use 730 days for optimizer so there are enough trades per combination
     let optPrices = prices;
-    if (prices.length < 365) {
-      try {
-        const res = await fetch('/api/prices?days=730');
-        if (res.ok) {
-          const data = await res.json() as { prices: PriceDay[] };
-          if (data.prices?.length > prices.length) optPrices = data.prices;
-        }
-      } catch {
-        // fall back to current prices
+    try {
+      const res = await fetch('/api/prices?days=730');
+      if (res.ok) {
+        const data = await res.json() as { prices: PriceDay[] };
+        if (data.prices?.length > prices.length) optPrices = data.prices;
       }
+    } catch {
+      // fall back to current prices
     }
 
     setTimeout(() => {
