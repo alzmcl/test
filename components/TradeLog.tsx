@@ -26,6 +26,7 @@ export default function TradeLog({ trades, portfolioSize }: Props) {
   const [sort, setSort] = useState<SortKey>('date');
 
   const closed = trades.filter((t) => t.exitDate !== null && t.pnlPct !== null && t.exitReason !== 'end_of_data');
+  const openAtCutoff = trades.filter((t) => t.exitReason === 'end_of_data');
 
   const sorted = [...closed].sort((a, b) => {
     if (sort === 'date') return b.entryDate !== a.entryDate ? b.entryDate - a.entryDate : a.slot - b.slot;
@@ -56,6 +57,57 @@ export default function TradeLog({ trades, portfolioSize }: Props) {
     </button>
   );
 
+  const gridCols = '1fr 1fr 0.6fr 0.4fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr';
+
+  const TradeRow = ({ t, i, isOpen }: { t: Trade; i: number; isOpen?: boolean }) => {
+    const pnl = t.pnlPct ?? 0;
+    const pnlDollar = Math.round((t.entryValue ?? 0) * portfolioSize * pnl);
+    const durationMs = (t.exitDate ?? t.entryDate) - t.entryDate;
+    const durationDays = Math.round(durationMs / 86_400_000);
+    const isWin = pnl > 0;
+
+    return (
+      <div
+        className="grid text-xs font-mono px-4 py-2.5 items-center"
+        style={{
+          gridTemplateColumns: gridCols,
+          background: isOpen ? '#0a1020' : i % 2 === 0 ? '#0c1626' : '#080e1a',
+          borderBottom: '1px solid #0f172a',
+          opacity: isOpen ? 0.75 : 1,
+        }}
+      >
+        <span style={{ color: isOpen ? '#475569' : '#64748b' }}>{formatDate(t.entryDate)}</span>
+        <span style={{ color: '#475569', fontStyle: isOpen ? 'italic' : 'normal' }}>
+          {isOpen ? 'open at cutoff' : t.exitDate ? formatDate(t.exitDate) : '—'}
+        </span>
+        <span style={{ color: '#475569' }}>{durationDays}d</span>
+        <span style={{ color: '#475569' }}>S{(t.slot ?? 0) + 1}</span>
+        <span style={{ color: '#64748b' }}>{formatPrice(Math.round((t.entryValue ?? 0) * portfolioSize))}</span>
+        <span style={{ color: '#94a3b8' }}>{formatPrice(t.entryPrice)}</span>
+        <span style={{ color: '#94a3b8' }}>
+          {t.exitPrice ? formatPrice(t.exitPrice) : '—'}
+        </span>
+        <span>
+          {isOpen && badge('open', '#94a3b8')}
+          {!isOpen && t.exitReason === 'trailing_stop' && badge('stop', isWin ? '#4ade80' : '#f87171')}
+          {!isOpen && t.exitReason === 'hard_stop' && badge('hard stop', '#f87171')}
+          {!isOpen && t.exitReason === 're_entry_dip' && badge('re-entry', '#38bdf8')}
+        </span>
+        <span>
+          {t.regime === 'choppy' && badge('choppy', '#f59e0b')}
+          {t.regime === 'trending' && badge('trend', '#f87171')}
+          {t.regime === 'unknown' && badge('?', '#475569')}
+        </span>
+        <span style={{ color: isOpen ? '#64748b' : isWin ? '#4ade80' : '#f87171', fontWeight: 600 }}>
+          {(pnl >= 0 ? '+' : '') + (pnl * 100).toFixed(2) + '%'}
+        </span>
+        <span style={{ color: isOpen ? '#64748b' : isWin ? '#4ade80' : '#f87171', fontWeight: 600 }}>
+          {isOpen ? '—' : (pnlDollar >= 0 ? '+' : '-') + formatPrice(Math.abs(pnlDollar))}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div className="px-8 pt-6">
       {/* Summary row */}
@@ -82,9 +134,9 @@ export default function TradeLog({ trades, portfolioSize }: Props) {
         <SortBtn id="duration" label="Duration" />
       </div>
 
-      {closed.length === 0 ? (
+      {closed.length === 0 && openAtCutoff.length === 0 ? (
         <p className="text-xs font-mono" style={{ color: '#475569' }}>
-          No closed trades yet — adjust the sliders to generate signals.
+          No trades yet — adjust the sliders to generate signals.
         </p>
       ) : (
         <div
@@ -95,7 +147,7 @@ export default function TradeLog({ trades, portfolioSize }: Props) {
           <div
             className="grid text-xs font-mono px-4 py-2"
             style={{
-              gridTemplateColumns: '1fr 1fr 0.6fr 0.4fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr',
+              gridTemplateColumns: gridCols,
               background: '#080e1a',
               color: '#334155',
             }}
@@ -115,54 +167,8 @@ export default function TradeLog({ trades, portfolioSize }: Props) {
 
           {/* Table rows */}
           <div style={{ maxHeight: '480px', overflowY: 'auto' }}>
-            {sorted.map((t, i) => {
-              const pnl = t.pnlPct ?? 0;
-              const pnlDollar = Math.round(portfolioSize * pnl);
-              const durationMs = (t.exitDate ?? t.entryDate) - t.entryDate;
-              const durationDays = Math.round(durationMs / 86_400_000);
-              const isWin = pnl > 0;
-
-              return (
-                <div
-                  key={i}
-                  className="grid text-xs font-mono px-4 py-2.5 items-center"
-                  style={{
-                    gridTemplateColumns: '1fr 1fr 0.6fr 0.4fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr',
-                    background: i % 2 === 0 ? '#0c1626' : '#080e1a',
-                    borderBottom: '1px solid #0f172a',
-                  }}
-                >
-                  <span style={{ color: '#64748b' }}>{formatDate(t.entryDate)}</span>
-                  <span style={{ color: '#64748b' }}>
-                    {t.exitDate ? formatDate(t.exitDate) : '—'}
-                  </span>
-                  <span style={{ color: '#475569' }}>{durationDays}d</span>
-                  <span style={{ color: '#475569' }}>S{(t.slot ?? 0) + 1}</span>
-                  <span style={{ color: '#64748b' }}>{formatPrice(Math.round((t.entryValue ?? 0) * portfolioSize))}</span>
-                  <span style={{ color: '#94a3b8' }}>{formatPrice(t.entryPrice)}</span>
-                  <span style={{ color: '#94a3b8' }}>
-                    {t.exitPrice ? formatPrice(t.exitPrice) : '—'}
-                  </span>
-                  <span>
-                    {t.exitReason === 'trailing_stop' && badge('stop', isWin ? '#4ade80' : '#f87171')}
-                    {t.exitReason === 'hard_stop' && badge('hard stop', '#f87171')}
-                    {t.exitReason === 'end_of_data' && badge('open', '#f59e0b')}
-                    {t.exitReason === 're_entry_dip' && badge('re-entry', '#38bdf8')}
-                  </span>
-                  <span>
-                    {t.regime === 'choppy' && badge('choppy', '#f59e0b')}
-                    {t.regime === 'trending' && badge('trend', '#f87171')}
-                    {t.regime === 'unknown' && badge('?', '#475569')}
-                  </span>
-                  <span style={{ color: isWin ? '#4ade80' : '#f87171', fontWeight: 600 }}>
-                    {(pnl >= 0 ? '+' : '') + (pnl * 100).toFixed(2) + '%'}
-                  </span>
-                  <span style={{ color: isWin ? '#4ade80' : '#f87171', fontWeight: 600 }}>
-                    {(pnlDollar >= 0 ? '+' : '-') + formatPrice(Math.abs(pnlDollar))}
-                  </span>
-                </div>
-              );
-            })}
+            {sorted.map((t, i) => <TradeRow key={i} t={t} i={i} />)}
+            {openAtCutoff.map((t, i) => <TradeRow key={'open-' + i} t={t} i={i} isOpen />)}
           </div>
         </div>
       )}
