@@ -70,19 +70,18 @@ export default function BacktestPanel({ result, config, onConfigChange }: Props)
               Backtester
             </span>
             <div className="flex gap-1">
-              {([
-                ['Default', DEFAULT_BACKTEST_CONFIG, '#1e293b', '#94a3b8'],
-                ['Range',   RANGE_MODE_CONFIG,       '#0e3a52', '#38bdf8'],
-              ] as [string, Partial<BacktestConfig>, string, string][]).map(([label, preset, bg, fg]) => (
-                <button
-                  key={label}
-                  onClick={() => onConfigChange({ ...config, ...preset })}
-                  className="text-xs font-mono px-2.5 py-1 rounded transition-colors"
-                  style={{ background: bg, color: fg, border: `1px solid ${fg}` }}
-                >
-                  {label}
-                </button>
-              ))}
+              <button
+                onClick={() => onConfigChange({ ...config, ...DEFAULT_BACKTEST_CONFIG })}
+                style={{ background: '#1e293b', color: '#e2e8f0', border: '1px solid #94a3b8', borderRadius: 4, padding: '2px 10px', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}
+              >
+                Default
+              </button>
+              <button
+                onClick={() => onConfigChange({ ...config, ...RANGE_MODE_CONFIG })}
+                style={{ background: '#0e3a52', color: '#38bdf8', border: '1px solid #38bdf8', borderRadius: 4, padding: '2px 10px', fontSize: 11, fontFamily: 'monospace', cursor: 'pointer' }}
+              >
+                Range
+              </button>
             </div>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
