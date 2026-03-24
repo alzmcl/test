@@ -28,7 +28,7 @@ export default function TradeLog({ trades, portfolioSize }: Props) {
   const closed = trades.filter((t) => t.exitDate !== null && t.pnlPct !== null && t.exitReason !== 'end_of_data');
 
   const sorted = [...closed].sort((a, b) => {
-    if (sort === 'date') return (b.exitDate ?? 0) - (a.exitDate ?? 0);
+    if (sort === 'date') return b.entryDate !== a.entryDate ? b.entryDate - a.entryDate : a.slot - b.slot;
     if (sort === 'pnl') return (a.pnlPct ?? 0) - (b.pnlPct ?? 0);
     if (sort === 'duration') {
       const da = (a.exitDate ?? a.entryDate) - a.entryDate;

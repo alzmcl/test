@@ -99,6 +99,10 @@ export function runBacktest(
     let anyInPosition = false;
 
     // ── 2. Process each slot ─────────────────────────────────────────────
+    // Snapshot inPosition BEFORE any entries this bar so S2 cannot piggy-back
+    // on S1 entering in the same loop iteration.
+    const inPositionSnapshot = slots.map((sl) => sl.inPosition);
+
     for (let s = 0; s < numSlots; s++) {
       const slot = slots[s];
 
@@ -148,7 +152,7 @@ export function runBacktest(
         }
       } else if (slot.cooldownBarsLeft === 0) {
         // Each successive slot requires a larger dip AND the previous slot must already be in position
-        const prevSlotIn = s === 0 || slots[s - 1].inPosition;
+        const prevSlotIn = s === 0 || inPositionSnapshot[s - 1];
         const slotDipThreshold = entryDipPct + s * slotDipIncrement;
         const dipTriggered = price <= windowHigh * (1 - slotDipThreshold);
         const reEntryOk = slot.lastExitPrice === 0 || price <= slot.lastExitPrice * (1 - reEntryDipPct);
