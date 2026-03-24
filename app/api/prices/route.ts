@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const days = Math.min(
     Math.max(parseInt(searchParams.get('days') ?? '180', 10), 30),
-    365
+    730
   );
 
   try {

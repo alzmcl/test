@@ -174,9 +174,23 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
   const [heatY, setHeatY] = useState<ParamKey>('trailingStopPct');
   const [hoveredCell, setHoveredCell] = useState<{ x: number; y: number; val: number } | null>(null);
 
-  function runOptimizer() {
+  async function runOptimizer() {
     setRunning(true);
     setResults([]);
+
+    // Always use 730 days for optimizer so there are enough trades per combination
+    let optPrices = prices;
+    if (prices.length < 365) {
+      try {
+        const res = await fetch('/api/prices?days=730');
+        if (res.ok) {
+          const data = await res.json() as { prices: PriceDay[] };
+          if (data.prices?.length > prices.length) optPrices = data.prices;
+        }
+      } catch {
+        // fall back to current prices
+      }
+    }
 
     setTimeout(() => {
       const found: OptResult[] = [];
@@ -195,7 +209,7 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                 reEntryDipPct,
               };
 
-              const res = runBacktest(prices, testConfig);
+              const res = runBacktest(optPrices, testConfig);
               const s = res.stats;
 
               found.push({
@@ -257,6 +271,7 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
           <p className="text-sm font-semibold mb-0.5" style={{ color: '#94a3b8' }}>Parameter Optimizer</p>
           <p className="text-xs font-mono" style={{ color: '#475569' }}>
             Grid search across {TOTAL} combinations — entry dip, trailing stop, activation, re-entry dip.
+            Uses up to 730 days of data regardless of chart view period.
           </p>
         </div>
         <button
