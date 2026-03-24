@@ -76,7 +76,7 @@ export const RANGE_MODE_CONFIG: Omit<BacktestConfig, 'portfolioSize'> = {
   entryDipPct: 0.03,
   trailingStopActivationPct: 0.05,
   trailingStopPct: 0.035,
-  reEntryDipPct: 0.05,
+  reEntryDipPct: 0.01,   // range mode: re-enter on any small dip after cooldown
   reEntryCooldownBars: 1,
   regimeFilter: false,
   lookbackDays: 7,
