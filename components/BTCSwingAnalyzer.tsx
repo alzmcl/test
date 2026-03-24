@@ -31,6 +31,7 @@ export default function BTCSwingAnalyzer() {
   const [config, setConfig] = useState<BacktestConfig>(DEFAULT_BACKTEST_CONFIG);
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [days, setDays] = useState(180);
+  const [startDate, setStartDate] = useState<string>('');
   const [activeTab, setActiveTab] = useState<Tab>('chart');
 
   // ── Fetch prices from our Next.js API route
@@ -54,15 +55,20 @@ export default function BTCSwingAnalyzer() {
       });
   }, [days]);
 
+  // ── Filter prices by optional start date
+  const filteredPrices = startDate
+    ? prices.filter((p) => p.date >= new Date(startDate).getTime())
+    : prices;
+
   // ── Run backtester whenever prices or config change
   useEffect(() => {
-    if (prices.length < 30) return;
-    const res = runBacktest(prices, config);
+    if (filteredPrices.length < 2) return;
+    const res = runBacktest(filteredPrices, config);
     setResult(res);
-  }, [prices, config]);
+  }, [filteredPrices, config]);
 
   // ── Derive 5%+ swing events for the table
-  const swings = prices.reduce(
+  const swings = filteredPrices.reduce(
     (acc, cur, i) => {
       if (i === 0) return acc;
       const prev = prices[i - 1];
@@ -87,11 +93,11 @@ export default function BTCSwingAnalyzer() {
     }[]
   );
 
-  const regimeDays = prices.length > 0
-    ? detectRegimes(prices, config.regimeAdxPeriod, config.regimeAdxThreshold)
+  const regimeDays = filteredPrices.length > 0
+    ? detectRegimes(filteredPrices, config.regimeAdxPeriod, config.regimeAdxThreshold)
     : [];
 
-  const stats = prices.length
+  const stats = filteredPrices.length
     ? {
         total: swings.length,
         gains: swings.filter((s) => s.change > 0).length,
@@ -101,7 +107,7 @@ export default function BTCSwingAnalyzer() {
           (swings.length || 1),
         biggestGain: Math.max(0, ...swings.map((s) => s.change)),
         biggestDrop: Math.min(0, ...swings.map((s) => s.change)),
-        days: prices.length,
+        days: filteredPrices.length,
       }
     : null;
 
@@ -126,23 +132,44 @@ export default function BTCSwingAnalyzer() {
             regime-filtered swing backtester
           </span>
 
-          {/* Day range selector */}
-          <select
-            value={days}
-            onChange={(e) => setDays(Number(e.target.value))}
-            className="ml-auto text-xs font-mono px-2 py-1 rounded"
-            style={{
-              background: '#0c1626',
-              border: '1px solid #1e293b',
-              color: '#94a3b8',
-            }}
-          >
-            {[90, 180, 270, 365, 730].map((d) => (
-              <option key={d} value={d}>
-                {d}d
-              </option>
-            ))}
-          </select>
+          {/* Date range controls */}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs font-mono" style={{ color: '#334155' }}>from</span>
+            <input
+              type="date"
+              value={startDate}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                // ensure we fetch enough history
+                if (e.target.value) {
+                  const daysNeeded = Math.ceil((Date.now() - new Date(e.target.value).getTime()) / 86400000) + 10;
+                  setDays(Math.min(730, Math.max(days, daysNeeded)));
+                }
+              }}
+              className="text-xs font-mono px-2 py-1 rounded"
+              style={{ background: '#0c1626', border: '1px solid #1e293b', color: '#94a3b8', colorScheme: 'dark' }}
+            />
+            {startDate && (
+              <button
+                onClick={() => setStartDate('')}
+                className="text-xs font-mono px-1.5 py-1 rounded"
+                style={{ background: '#1e293b', color: '#64748b', border: '1px solid #1e293b' }}
+              >
+                ✕
+              </button>
+            )}
+            <select
+              value={days}
+              onChange={(e) => setDays(Number(e.target.value))}
+              className="text-xs font-mono px-2 py-1 rounded"
+              style={{ background: '#0c1626', border: '1px solid #1e293b', color: '#94a3b8' }}
+            >
+              {[90, 180, 270, 365, 730].map((d) => (
+                <option key={d} value={d}>{d}d</option>
+              ))}
+            </select>
+          </div>
         </div>
         <h1
           className="text-3xl font-bold"
@@ -199,7 +226,7 @@ export default function BTCSwingAnalyzer() {
           {/* Chart tab */}
           {activeTab === 'chart' && (
             <>
-              <PriceChart prices={prices} regimeDays={regimeDays} trades={result?.trades ?? []} />
+              <PriceChart prices={filteredPrices} regimeDays={regimeDays} trades={result?.trades ?? []} />
               <BacktestPanel
                 result={result}
                 config={config}
@@ -243,7 +270,7 @@ export default function BTCSwingAnalyzer() {
           {activeTab === 'equity' && (
             <EquityCurve
               equityCurve={result?.equityCurve ?? []}
-              prices={prices}
+              prices={filteredPrices}
               lookbackDays={config.lookbackDays}
               portfolioSize={config.portfolioSize}
             />
@@ -252,7 +279,7 @@ export default function BTCSwingAnalyzer() {
           {/* Optimizer tab */}
           {activeTab === 'optimizer' && (
             <Optimizer
-              prices={prices}
+              prices={filteredPrices}
               config={config}
               onConfigApply={(c) => {
                 setConfig(c);
