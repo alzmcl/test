@@ -54,6 +54,10 @@ export interface BacktestConfig {
   regimeAdxThreshold: number;
   /** Portfolio starting size in USD */
   portfolioSize: number;
+  /** % of portfolio deployed per trade (remainder stays in cash). 100 = all-in. */
+  allocationPct: number;
+  /** Annual yield % on idle cash (e.g. 3 = 3% savings rate). */
+  cashYieldPct: number;
 }
 
 export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
@@ -69,6 +73,8 @@ export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
   regimeAdxPeriod: 20,
   regimeAdxThreshold: 5,
   portfolioSize: 10000,
+  allocationPct: 100,
+  cashYieldPct: 3,
 };
 
 /**
@@ -87,6 +93,8 @@ export const RANGE_MODE_CONFIG: Omit<BacktestConfig, 'portfolioSize'> = {
   feePct: 0.001,
   regimeAdxPeriod: 20,
   regimeAdxThreshold: 5,
+  allocationPct: 100,
+  cashYieldPct: 3,
 };
 
 export type TradeSide = 'buy' | 'sell';
@@ -102,9 +110,15 @@ export interface Trade {
   regime: Regime;
 }
 
+export interface EquityPoint {
+  date: number;
+  equity: number;      // total normalised portfolio (btc + cash)
+  inPosition: boolean;
+}
+
 export interface BacktestResult {
   trades: Trade[];
-  equityCurve: { date: number; equity: number }[];
+  equityCurve: EquityPoint[];
   stats: BacktestStats;
 }
 
@@ -119,6 +133,7 @@ export interface BacktestStats {
   tradesInTrending: number;
   tradesInChoppy: number;
   portfolioFinalValue: number;
+  timeInMarketPct: number;
 }
 
 // ─── Supabase DB rows ───────────────────────────────────────────────────────

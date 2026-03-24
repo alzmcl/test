@@ -12,14 +12,18 @@
  *                       below last exit price
  *  4. Regime filter  — if regimeFilter=true, only enter in 'choppy' days;
  *                       ignore dip signals on 'trending' days
+ *  5. Allocation     — only allocationPct% of portfolio goes into each trade;
+ *                       remainder earns cashYieldPct% annual rate in cash
  *
  * One position at a time (no pyramiding).
+ * Equity is tracked day-by-day so idle cash accrues yield continuously.
  */
 
 import type {
   BacktestConfig,
   BacktestResult,
   BacktestStats,
+  EquityPoint,
   Trade,
   TradeReason,
 } from '@/types';
@@ -45,114 +49,119 @@ export function runBacktest(
     regimeAdxPeriod,
     regimeAdxThreshold,
     portfolioSize,
+    allocationPct = 100,
+    cashYieldPct = 0,
   } = config;
+
+  const allocationFrac = Math.min(1, Math.max(0, allocationPct / 100));
+  const dailyCashRate = Math.pow(1 + cashYieldPct / 100, 1 / 365) - 1;
 
   const regimeDays = detectRegimes(prices, regimeAdxPeriod, regimeAdxThreshold);
   const n = regimeDays.length;
 
   const trades: Trade[] = [];
-  const equityCurve: { date: number; equity: number }[] = [];
+  const equityCurve: EquityPoint[] = [];
 
-  let equity = 1.0;           // normalised — starts at $1
+  // Portfolio tracked as two buckets (both normalised so they start at 1 total)
+  let btcValue = 0;    // fraction of initial portfolio currently in BTC
+  let cashValue = 1.0; // fraction of initial portfolio currently in cash
+
   let inPosition = false;
   let entryPrice = 0;
-  let positionHigh = 0;       // highest close since entry
+  let positionHigh = 0;
   let cooldownBarsLeft = 0;
-  let lastExitPrice = 0;      // track for re-entry dip gate
+  let lastExitPrice = 0;
   let currentTrade: Omit<Trade, 'exitDate' | 'exitPrice' | 'exitReason' | 'pnlPct'> | null = null;
+  let daysInMarket = 0;
 
   for (let i = lookbackDays; i < n; i++) {
     const day = regimeDays[i];
     const price = day.price;
+    const prevPrice = regimeDays[i - 1].price;
 
-    // — Rolling lookback high (exclusive of today)
-    const windowHigh = Math.max(...regimeDays.slice(i - lookbackDays, i).map((d) => d.price));
+    // ── 1. Apply daily returns ────────────────────────────────────────────
+    if (inPosition) {
+      const btcDailyReturn = (price - prevPrice) / prevPrice;
+      btcValue *= (1 + btcDailyReturn);
+      cashValue *= (1 + dailyCashRate);
+      daysInMarket++;
+    } else {
+      cashValue *= (1 + dailyCashRate);
+    }
 
-    // — Cooldown tick
+    // ── 2. Cooldown tick ─────────────────────────────────────────────────
     if (cooldownBarsLeft > 0) cooldownBarsLeft--;
 
+    // ── 3. Exit checks ───────────────────────────────────────────────────
     if (inPosition) {
-      // Update trailing high
       if (price > positionHigh) positionHigh = price;
 
-      // Trailing stop only activates after position has gained trailingStopActivationPct
       const gainFromEntry = (positionHigh - entryPrice) / entryPrice;
       const trailingActive = gainFromEntry >= trailingStopActivationPct;
+      let exitReason: TradeReason | null = null;
 
-      if (trailingActive) {
-        const stopLevel = positionHigh * (1 - trailingStopPct);
-        if (price <= stopLevel) {
-          const exitReason: TradeReason = 'trailing_stop';
-          const grossReturn = (price - entryPrice) / entryPrice;
-          const pnlPct = grossReturn - 2 * feePct; // buy + sell fee
-          equity *= 1 + pnlPct;
-          lastExitPrice = price;
-
-          trades.push({
-            ...currentTrade!,
-            exitDate: day.date,
-            exitPrice: price,
-            exitReason,
-            pnlPct,
-          });
-
-          inPosition = false;
-          currentTrade = null;
-          cooldownBarsLeft = reEntryCooldownBars;
-        }
-      } else if (hardStopPct > 0) {
-        // Hard stop-loss: protect against large losses before trailing stop activates
+      if (trailingActive && price <= positionHigh * (1 - trailingStopPct)) {
+        exitReason = 'trailing_stop';
+      } else if (!trailingActive && hardStopPct > 0) {
         const lossFromEntry = (entryPrice - price) / entryPrice;
-        if (lossFromEntry >= hardStopPct) {
-          const exitReason: TradeReason = 'hard_stop';
-          const grossReturn = (price - entryPrice) / entryPrice;
-          const pnlPct = grossReturn - 2 * feePct;
-          equity *= 1 + pnlPct;
-          lastExitPrice = price;
-
-          trades.push({
-            ...currentTrade!,
-            exitDate: day.date,
-            exitPrice: price,
-            exitReason,
-            pnlPct,
-          });
-
-          inPosition = false;
-          currentTrade = null;
-          cooldownBarsLeft = reEntryCooldownBars;
-        }
+        if (lossFromEntry >= hardStopPct) exitReason = 'hard_stop';
       }
-    } else {
-      // Not in position — look for entry
-      if (cooldownBarsLeft === 0) {
-        const regimeOk = !regimeFilter || day.regime === 'choppy';
-        const dipTriggered = price <= windowHigh * (1 - entryDipPct);
-        // Re-entry gate: if we have a prior exit, require dip below that exit price
-        const reEntryOk = lastExitPrice === 0 || price <= lastExitPrice * (1 - reEntryDipPct);
 
-        if (regimeOk && dipTriggered && reEntryOk) {
-          entryPrice = price;
-          positionHigh = price;
-          inPosition = true;
-          currentTrade = {
-            entryDate: day.date,
-            entryPrice: price,
-            regime: day.regime,
-          };
-        }
+      if (exitReason) {
+        btcValue *= (1 - feePct); // exit fee
+        const grossReturn = (price - entryPrice) / entryPrice;
+        const pnlPct = grossReturn - 2 * feePct;
+        lastExitPrice = price;
+
+        trades.push({
+          ...currentTrade!,
+          exitDate: day.date,
+          exitPrice: price,
+          exitReason,
+          pnlPct,
+        });
+
+        cashValue = btcValue + cashValue; // merge back to cash
+        btcValue = 0;
+        inPosition = false;
+        currentTrade = null;
+        cooldownBarsLeft = reEntryCooldownBars;
       }
     }
 
-    equityCurve.push({ date: day.date, equity: Math.round(equity * 10000) / 10000 });
+    // ── 4. Entry check ───────────────────────────────────────────────────
+    if (!inPosition && cooldownBarsLeft === 0) {
+      const windowHigh = Math.max(...regimeDays.slice(i - lookbackDays, i).map((d) => d.price));
+      const regimeOk = !regimeFilter || day.regime === 'choppy';
+      const dipTriggered = price <= windowHigh * (1 - entryDipPct);
+      const reEntryOk = lastExitPrice === 0 || price <= lastExitPrice * (1 - reEntryDipPct);
+
+      if (regimeOk && dipTriggered && reEntryOk) {
+        const totalEquity = cashValue; // btcValue is 0 when not in position
+        btcValue = totalEquity * allocationFrac * (1 - feePct); // entry fee
+        cashValue = totalEquity * (1 - allocationFrac);
+        inPosition = true;
+        entryPrice = price;
+        positionHigh = price;
+        currentTrade = {
+          entryDate: day.date,
+          entryPrice: price,
+          regime: day.regime,
+        };
+      }
+    }
+
+    // ── 5. Record equity ─────────────────────────────────────────────────
+    const equity = Math.round((btcValue + cashValue) * 10000) / 10000;
+    equityCurve.push({ date: day.date, equity, inPosition });
   }
 
   // Close any open trade at last bar
   if (inPosition && currentTrade) {
     const lastDay = regimeDays[n - 1];
+    btcValue *= (1 - feePct);
     const grossReturn = (lastDay.price - entryPrice) / entryPrice;
     const pnlPct = grossReturn - 2 * feePct;
-    equity *= 1 + pnlPct;
 
     trades.push({
       ...currentTrade,
@@ -163,7 +172,8 @@ export function runBacktest(
     });
   }
 
-  const stats = computeStats(trades, equityCurve, portfolioSize);
+  const totalBars = n - lookbackDays;
+  const stats = computeStats(trades, equityCurve, portfolioSize, daysInMarket, totalBars);
 
   return { trades, equityCurve, stats };
 }
@@ -172,8 +182,10 @@ export function runBacktest(
 
 function computeStats(
   trades: Trade[],
-  equityCurve: { date: number; equity: number }[],
-  portfolioSize: number
+  equityCurve: EquityPoint[],
+  portfolioSize: number,
+  daysInMarket: number,
+  totalBars: number,
 ): BacktestStats {
   const closedTrades = trades.filter((t) => t.pnlPct !== null);
   const wins = closedTrades.filter((t) => (t.pnlPct ?? 0) > 0);
@@ -187,12 +199,10 @@ function computeStats(
     ? losses.reduce((a, t) => a + (t.pnlPct ?? 0), 0) / losses.length
     : 0;
 
-  // Total return from equity curve
   const firstEquity = equityCurve[0]?.equity ?? 1;
   const lastEquity = equityCurve[equityCurve.length - 1]?.equity ?? 1;
   const totalReturnPct = (lastEquity - firstEquity) / firstEquity;
 
-  // Max drawdown
   let peak = firstEquity;
   let maxDrawdown = 0;
   for (const { equity } of equityCurve) {
@@ -201,7 +211,6 @@ function computeStats(
     if (dd > maxDrawdown) maxDrawdown = dd;
   }
 
-  // Sharpe proxy: annualised mean / std of daily returns
   const dailyReturns: number[] = [];
   for (let i = 1; i < equityCurve.length; i++) {
     dailyReturns.push(
@@ -219,12 +228,12 @@ function computeStats(
 
   const tradesInTrending = trades.filter((t) => t.regime === 'trending').length;
   const tradesInChoppy = trades.filter((t) => t.regime === 'choppy').length;
-
   const portfolioFinalValue = Math.round(portfolioSize * (1 + totalReturnPct));
+  const timeInMarketPct = totalBars > 0 ? Math.round((daysInMarket / totalBars) * 1000) / 10 : 0;
 
   return {
     totalTrades: closedTrades.length,
-    winRate: Math.round(winRate * 1000) / 10,     // store as %
+    winRate: Math.round(winRate * 1000) / 10,
     avgWinPct: Math.round(avgWinPct * 10000) / 100,
     avgLossPct: Math.round(avgLossPct * 10000) / 100,
     totalReturnPct: Math.round(totalReturnPct * 10000) / 100,
@@ -233,5 +242,6 @@ function computeStats(
     tradesInTrending,
     tradesInChoppy,
     portfolioFinalValue,
+    timeInMarketPct,
   };
 }

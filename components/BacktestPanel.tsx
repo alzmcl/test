@@ -158,6 +158,22 @@ export default function BacktestPanel({ result, config, onConfigChange }: Props)
               onChange={(v) => update({ reEntryCooldownBars: v })}
             />
 
+            <SliderGroup label="Capital" />
+            <Slider
+              label="Allocation per trade %"
+              value={config.allocationPct}
+              min={10} max={100} step={5}
+              format={(v) => v + '%'}
+              onChange={(v) => update({ allocationPct: v })}
+            />
+            <Slider
+              label="Cash yield % (annual)"
+              value={config.cashYieldPct}
+              min={0} max={8} step={0.5}
+              format={(v) => v.toFixed(1) + '%'}
+              onChange={(v) => update({ cashYieldPct: v })}
+            />
+
             <SliderGroup label="Regime" />
             <Slider
               label="MA period"
@@ -210,6 +226,7 @@ export default function BacktestPanel({ result, config, onConfigChange }: Props)
                   ['Sharpe (proxy)', s.sharpeProxy],
                   ['In choppy',      s.tradesInChoppy + ' trades'],
                   ['Final value',    formatPrice(s.portfolioFinalValue)],
+                  ['Time in market', s.timeInMarketPct + '%'],
                 ] as [string, string | number][]).map(([k, v]) => (
                   <div key={k}>
                     <p className="text-xs mb-0.5" style={{ color: '#334155' }}>{k}</p>

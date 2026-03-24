@@ -254,6 +254,7 @@ export default function BTCSwingAnalyzer() {
               prices={filteredPrices}
               lookbackDays={config.lookbackDays}
               portfolioSize={config.portfolioSize}
+              cashYieldPct={config.cashYieldPct ?? 0}
             />
           )}
 
