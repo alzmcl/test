@@ -25,7 +25,7 @@ function badge(text: string, color: string) {
 export default function TradeLog({ trades, portfolioSize }: Props) {
   const [sort, setSort] = useState<SortKey>('date');
 
-  const closed = trades.filter((t) => t.exitDate !== null && t.pnlPct !== null);
+  const closed = trades.filter((t) => t.exitDate !== null && t.pnlPct !== null && t.exitReason !== 'end_of_data');
 
   const sorted = [...closed].sort((a, b) => {
     if (sort === 'date') return (b.exitDate ?? 0) - (a.exitDate ?? 0);

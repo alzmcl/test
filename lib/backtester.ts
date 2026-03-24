@@ -187,7 +187,7 @@ function computeStats(
   daysInMarket: number,
   totalBars: number,
 ): BacktestStats {
-  const closedTrades = trades.filter((t) => t.pnlPct !== null);
+  const closedTrades = trades.filter((t) => t.pnlPct !== null && t.exitReason !== 'end_of_data');
   const wins = closedTrades.filter((t) => (t.pnlPct ?? 0) > 0);
   const losses = closedTrades.filter((t) => (t.pnlPct ?? 0) <= 0);
 
