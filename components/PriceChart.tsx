@@ -19,18 +19,30 @@ interface Props {
 }
 
 interface DayMarker {
-  entrySlots: number[];   // slot indices that entered on this day
-  exitOutcome?: 'win' | 'loss';
+  entrySlots: number[];
+  exitSlots: { slot: number; outcome: 'win' | 'loss' }[];
 }
 
 function upTriangle(cx: number, cy: number, offset: number, fill: string, label: number) {
   const y = cy - 10 - offset;
-  const w = 8;   // half-width
-  const h = 15;  // height
+  const w = 8, h = 15;
   return (
     <g key={offset}>
       <polygon points={`${cx},${y} ${cx - w},${y + h} ${cx + w},${y + h}`} fill={fill} opacity={0.9} />
       <text x={cx} y={y + h - 3} textAnchor="middle" fontSize={9} fontWeight="bold" fill="#0f172a" style={{ pointerEvents: 'none', userSelect: 'none' }}>
+        {label}
+      </text>
+    </g>
+  );
+}
+
+function downTriangle(cx: number, cy: number, offset: number, fill: string, label: number) {
+  const y = cy + 8 + offset;
+  const w = 8, h = 15;
+  return (
+    <g key={offset}>
+      <polygon points={`${cx},${y + h} ${cx - w},${y} ${cx + w},${y}`} fill={fill} opacity={0.9} />
+      <text x={cx} y={y + 10} textAnchor="middle" fontSize={9} fontWeight="bold" fill="#0f172a" style={{ pointerEvents: 'none', userSelect: 'none' }}>
         {label}
       </text>
     </g>
@@ -44,19 +56,15 @@ function CustomDot(props: {
 }) {
   const { cx, cy, payload } = props;
   if (!payload?.marker || cx == null || cy == null) return null;
-  const { entrySlots, exitOutcome } = payload.marker;
+  const { entrySlots, exitSlots } = payload.marker;
 
   return (
     <g>
       {entrySlots.map((slot, i) =>
         upTriangle(cx, cy, i * 17, '#fbbf24', slot + 1)
       )}
-      {exitOutcome && (
-        <polygon
-          points={`${cx},${cy + 9} ${cx - 8},${cy - 5} ${cx + 8},${cy - 5}`}
-          fill={exitOutcome === 'win' ? '#4ade80' : '#f87171'}
-          opacity={0.9}
-        />
+      {exitSlots.map(({ slot, outcome }, i) =>
+        downTriangle(cx, cy, i * 17, outcome === 'win' ? '#4ade80' : '#f87171', slot + 1)
       )}
     </g>
   );
@@ -91,8 +99,11 @@ function CustomTooltip({
       {d.marker?.entrySlots.map((s) => (
         <p key={s} className="mt-1" style={{ color: '#fbbf24' }}>▲ entry (slot {s + 1})</p>
       ))}
-      {d.marker?.exitOutcome === 'win'  && <p className="mt-1" style={{ color: '#4ade80' }}>▼ exit (win)</p>}
-      {d.marker?.exitOutcome === 'loss' && <p className="mt-1" style={{ color: '#f87171' }}>▼ exit (loss)</p>}
+      {d.marker?.exitSlots.map(({ slot, outcome }) => (
+        <p key={slot} className="mt-1" style={{ color: outcome === 'win' ? '#4ade80' : '#f87171' }}>
+          ▼ exit S{slot + 1} ({outcome})
+        </p>
+      ))}
     </div>
   );
 }
@@ -101,13 +112,13 @@ export default function PriceChart({ prices, regimeDays, trades, numSlots }: Pro
   // Build per-date marker map (aggregates all slots)
   const markerMap = new Map<number, DayMarker>();
   const getOrCreate = (date: number) => {
-    if (!markerMap.has(date)) markerMap.set(date, { entrySlots: [] });
+    if (!markerMap.has(date)) markerMap.set(date, { entrySlots: [], exitSlots: [] });
     return markerMap.get(date)!;
   };
   trades.forEach((t) => {
     getOrCreate(t.entryDate).entrySlots.push(t.slot ?? 0);
     if (t.exitDate != null && t.pnlPct != null && t.exitReason !== 'end_of_data') {
-      getOrCreate(t.exitDate).exitOutcome = t.pnlPct >= 0 ? 'win' : 'loss';
+      getOrCreate(t.exitDate).exitSlots.push({ slot: t.slot ?? 0, outcome: t.pnlPct >= 0 ? 'win' : 'loss' });
     }
   });
 
