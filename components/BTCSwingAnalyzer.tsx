@@ -18,9 +18,17 @@ const THRESHOLD = 0.05;
 type Tab = 'chart' | 'trades' | 'equity' | 'optimizer';
 
 const ASSETS = [
-  { id: 'BTC', label: 'BTC / USD', color: '#f59e0b', title: 'Bitcoin Swing' },
-  { id: 'ETH', label: 'ETH / USD', color: '#818cf8', title: 'Ethereum Swing' },
-  { id: 'QQQ', label: 'QQQ / USD', color: '#4ade80', title: 'Nasdaq (QQQ) Swing' },
+  // Crypto
+  { id: 'BTC',  label: 'BTC / USD',  color: '#f59e0b', title: 'Bitcoin Swing',          group: 'Crypto' },
+  { id: 'ETH',  label: 'ETH / USD',  color: '#818cf8', title: 'Ethereum Swing',         group: 'Crypto' },
+  // Broad market
+  { id: 'QQQ',  label: 'QQQ',        color: '#4ade80', title: 'Nasdaq 100 (QQQ) Swing', group: 'ETF' },
+  // AI stocks
+  { id: 'NVDA', label: 'NVDA',       color: '#22d3ee', title: 'Nvidia Swing',            group: 'AI' },
+  { id: 'MSFT', label: 'MSFT',       color: '#60a5fa', title: 'Microsoft Swing',         group: 'AI' },
+  { id: 'GOOGL',label: 'GOOGL',      color: '#f97316', title: 'Alphabet Swing',          group: 'AI' },
+  // AI ETF
+  { id: 'BOTZ', label: 'BOTZ',       color: '#e879f9', title: 'AI & Robotics (BOTZ) Swing', group: 'AI ETF' },
 ];
 
 const TABS: { id: Tab; label: string }[] = [
@@ -127,7 +135,8 @@ export default function BTCSwingAnalyzer() {
           background: 'linear-gradient(180deg,#080e1a 0%,#060b14 100%)',
         }}
       >
-        <div className="flex items-baseline gap-3 mb-2 flex-wrap">
+        {/* Top row: ticker + description + date controls */}
+        <div className="flex items-center gap-3 mb-3 flex-wrap">
           <span
             className="text-xs font-mono uppercase tracking-widest"
             style={{ color: asset.color }}
@@ -137,26 +146,6 @@ export default function BTCSwingAnalyzer() {
           <span className="text-xs font-mono" style={{ color: '#334155' }}>
             regime-filtered swing backtester
           </span>
-
-          {/* Asset picker */}
-          <div className="flex gap-1 ml-4">
-            {ASSETS.map((a) => (
-              <button
-                key={a.id}
-                onClick={() => setAssetId(a.id)}
-                className="text-xs font-mono px-2.5 py-1 rounded"
-                style={{
-                  background: assetId === a.id ? a.color + '22' : 'transparent',
-                  color: assetId === a.id ? a.color : '#475569',
-                  border: assetId === a.id ? `1px solid ${a.color}44` : '1px solid transparent',
-                }}
-              >
-                {a.id}
-              </button>
-            ))}
-          </div>
-
-          {/* Date range controls */}
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs font-mono" style={{ color: '#334155' }}>from</span>
             <input
@@ -180,12 +169,42 @@ export default function BTCSwingAnalyzer() {
           </div>
         </div>
         <h1
-          className="text-3xl font-bold"
+          className="text-3xl font-bold mb-4"
           style={{ letterSpacing: '-0.03em', lineHeight: 1.1, color: '#f1f5f9' }}
         >
           {asset.title}<br />
           <span style={{ color: asset.color }}>Strategy Scanner</span>
         </h1>
+
+        {/* Asset picker — grouped */}
+        {(() => {
+          const groups = Array.from(new Set(ASSETS.map((a) => a.group)));
+          return (
+            <div className="flex items-center gap-4 flex-wrap">
+              {groups.map((group) => (
+                <div key={group} className="flex items-center gap-1">
+                  <span className="text-xs font-mono mr-1" style={{ color: '#334155' }}>
+                    {group}
+                  </span>
+                  {ASSETS.filter((a) => a.group === group).map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => setAssetId(a.id)}
+                      className="text-xs font-mono px-2.5 py-1 rounded"
+                      style={{
+                        background: assetId === a.id ? a.color + '22' : 'transparent',
+                        color: assetId === a.id ? a.color : '#475569',
+                        border: assetId === a.id ? `1px solid ${a.color}44` : '1px solid #1e293b',
+                      }}
+                    >
+                      {a.id}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </header>
 
       {loading && (

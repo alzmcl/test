@@ -4,9 +4,13 @@ const EODHD_BASE = 'https://eodhd.com/api/eod';
 
 // Map from our asset id to EODHD ticker symbol
 const EODHD_TICKER: Record<string, string> = {
-  BTC: 'BTC-USD.CC',
-  ETH: 'ETH-USD.CC',
-  QQQ: 'QQQ.US',
+  BTC:   'BTC-USD.CC',
+  ETH:   'ETH-USD.CC',
+  QQQ:   'QQQ.US',
+  NVDA:  'NVDA.US',
+  MSFT:  'MSFT.US',
+  GOOGL: 'GOOGL.US',
+  BOTZ:  'BOTZ.US',
 };
 
 /**
