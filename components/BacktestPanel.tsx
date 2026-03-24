@@ -160,6 +160,20 @@ export default function BacktestPanel({ result, config, onConfigChange }: Props)
 
             <SliderGroup label="Capital" />
             <Slider
+              label="Concurrent slots"
+              value={config.numSlots}
+              min={1} max={4} step={1}
+              format={(v) => v.toString()}
+              onChange={(v) => update({ numSlots: v })}
+            />
+            <Slider
+              label="Slot dip increment %"
+              value={config.slotDipIncrement}
+              min={0.005} max={0.08} step={0.005}
+              format={(v) => (v * 100).toFixed(1) + '%'}
+              onChange={(v) => update({ slotDipIncrement: v })}
+            />
+            <Slider
               label="Allocation per trade %"
               value={config.allocationPct}
               min={10} max={100} step={5}

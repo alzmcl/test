@@ -58,6 +58,10 @@ export interface BacktestConfig {
   allocationPct: number;
   /** Annual yield % on idle cash (e.g. 3 = 3% savings rate). */
   cashYieldPct: number;
+  /** Number of concurrent position slots (1 = original single-position). */
+  numSlots: number;
+  /** Additional dip % required for each successive slot (e.g. 0.02 = slot 1 needs 2% more dip than slot 0). */
+  slotDipIncrement: number;
 }
 
 export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
@@ -75,6 +79,8 @@ export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
   portfolioSize: 10000,
   allocationPct: 100,
   cashYieldPct: 3,
+  numSlots: 1,
+  slotDipIncrement: 0.02,
 };
 
 /**
@@ -95,6 +101,8 @@ export const RANGE_MODE_CONFIG: Omit<BacktestConfig, 'portfolioSize'> = {
   regimeAdxThreshold: 5,
   allocationPct: 100,
   cashYieldPct: 3,
+  numSlots: 1,
+  slotDipIncrement: 0.02,
 };
 
 export type TradeSide = 'buy' | 'sell';
