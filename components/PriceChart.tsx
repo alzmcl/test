@@ -22,9 +22,18 @@ interface DayMarker {
   exitOutcome?: 'win' | 'loss';
 }
 
-function upTriangle(cx: number, cy: number, offset: number, fill: string) {
-  const y = cy - 7 - offset;
-  return <polygon key={offset} points={`${cx},${y} ${cx - 5},${y + 11} ${cx + 5},${y + 11}`} fill={fill} opacity={0.9} />;
+function upTriangle(cx: number, cy: number, offset: number, fill: string, label: number) {
+  const y = cy - 10 - offset;
+  const w = 8;   // half-width
+  const h = 15;  // height
+  return (
+    <g key={offset}>
+      <polygon points={`${cx},${y} ${cx - w},${y + h} ${cx + w},${y + h}`} fill={fill} opacity={0.9} />
+      <text x={cx} y={y + h - 3} textAnchor="middle" fontSize={9} fontWeight="bold" fill="#0f172a" style={{ pointerEvents: 'none', userSelect: 'none' }}>
+        {label}
+      </text>
+    </g>
+  );
 }
 
 function CustomDot(props: {
@@ -38,12 +47,12 @@ function CustomDot(props: {
 
   return (
     <g>
-      {entrySlots.map((_, i) =>
-        upTriangle(cx, cy, i * 10, '#fbbf24')
+      {entrySlots.map((slot, i) =>
+        upTriangle(cx, cy, i * 17, '#fbbf24', slot + 1)
       )}
       {exitOutcome && (
         <polygon
-          points={`${cx},${cy + 7} ${cx - 5},${cy - 4} ${cx + 5},${cy - 4}`}
+          points={`${cx},${cy + 9} ${cx - 8},${cy - 5} ${cx + 8},${cy - 5}`}
           fill={exitOutcome === 'win' ? '#4ade80' : '#f87171'}
           opacity={0.9}
         />
