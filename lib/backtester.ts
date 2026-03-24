@@ -166,6 +166,7 @@ export function runBacktest(
               entryDate: day.date,
               entryPrice: price,
               regime: day.regime,
+              slot: s,
             };
           }
         }

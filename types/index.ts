@@ -116,6 +116,7 @@ export interface Trade {
   exitReason: TradeReason | null;
   pnlPct: number | null;          // after fees
   regime: Regime;
+  slot: number;                   // 0-indexed slot that generated this trade
 }
 
 export interface EquityPoint {

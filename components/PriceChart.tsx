@@ -17,23 +17,39 @@ interface Props {
   trades: Trade[];
 }
 
-type TradeMarker = 'entry' | 'win' | 'loss';
+interface DayMarker {
+  entrySlots: number[];   // slot indices that entered on this day
+  exitOutcome?: 'win' | 'loss';
+}
+
+function upTriangle(cx: number, cy: number, offset: number, fill: string) {
+  const y = cy - 7 - offset;
+  return <polygon key={offset} points={`${cx},${y} ${cx - 5},${y + 11} ${cx + 5},${y + 11}`} fill={fill} opacity={0.9} />;
+}
 
 function CustomDot(props: {
   cx?: number;
   cy?: number;
-  payload?: PriceDay & { tradeMarker?: TradeMarker };
+  payload?: PriceDay & { marker?: DayMarker };
 }) {
   const { cx, cy, payload } = props;
-  if (!payload?.tradeMarker || cx == null || cy == null) return null;
+  if (!payload?.marker || cx == null || cy == null) return null;
+  const { entrySlots, exitOutcome } = payload.marker;
 
-  if (payload.tradeMarker === 'entry') {
-    // upward triangle, cyan
-    return <polygon points={`${cx},${cy - 7} ${cx - 5},${cy + 4} ${cx + 5},${cy + 4}`} fill="#fbbf24" opacity={0.9} />;
-  }
-  const color = payload.tradeMarker === 'win' ? '#4ade80' : '#f87171';
-  // downward triangle
-  return <polygon points={`${cx},${cy + 7} ${cx - 5},${cy - 4} ${cx + 5},${cy - 4}`} fill={color} opacity={0.9} />;
+  return (
+    <g>
+      {entrySlots.map((_, i) =>
+        upTriangle(cx, cy, i * 10, '#fbbf24')
+      )}
+      {exitOutcome && (
+        <polygon
+          points={`${cx},${cy + 7} ${cx - 5},${cy - 4} ${cx + 5},${cy - 4}`}
+          fill={exitOutcome === 'win' ? '#4ade80' : '#f87171'}
+          opacity={0.9}
+        />
+      )}
+    </g>
+  );
 }
 
 function CustomTooltip({
@@ -41,7 +57,7 @@ function CustomTooltip({
   payload,
 }: {
   active?: boolean;
-  payload?: { payload: PriceDay & { tradeMarker?: TradeMarker; regime?: string } }[];
+  payload?: { payload: PriceDay & { marker?: DayMarker; regime?: string } }[];
 }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
@@ -57,30 +73,33 @@ function CustomTooltip({
           {d.regime === 'trending' ? '↗ trending' : '↔ choppy'}
         </p>
       )}
-      {d.tradeMarker === 'entry' && <p className="mt-1" style={{ color: '#fbbf24' }}>▲ entry</p>}
-      {d.tradeMarker === 'win'   && <p className="mt-1" style={{ color: '#4ade80' }}>▼ exit (win)</p>}
-      {d.tradeMarker === 'loss'  && <p className="mt-1" style={{ color: '#f87171' }}>▼ exit (loss)</p>}
+      {d.marker?.entrySlots.map((s) => (
+        <p key={s} className="mt-1" style={{ color: '#fbbf24' }}>▲ entry (slot {s + 1})</p>
+      ))}
+      {d.marker?.exitOutcome === 'win'  && <p className="mt-1" style={{ color: '#4ade80' }}>▼ exit (win)</p>}
+      {d.marker?.exitOutcome === 'loss' && <p className="mt-1" style={{ color: '#f87171' }}>▼ exit (loss)</p>}
     </div>
   );
 }
 
 export default function PriceChart({ prices, regimeDays, trades }: Props) {
-  const entryDates = new Set(trades.map((t) => t.entryDate));
-  const exitMap = new Map<number, 'win' | 'loss'>();
+  // Build per-date marker map (aggregates all slots)
+  const markerMap = new Map<number, DayMarker>();
+  const getOrCreate = (date: number) => {
+    if (!markerMap.has(date)) markerMap.set(date, { entrySlots: [] });
+    return markerMap.get(date)!;
+  };
   trades.forEach((t) => {
-    if (t.exitDate != null && t.pnlPct != null) {
-      exitMap.set(t.exitDate, t.pnlPct >= 0 ? 'win' : 'loss');
+    getOrCreate(t.entryDate).entrySlots.push(t.slot ?? 0);
+    if (t.exitDate != null && t.pnlPct != null && t.exitReason !== 'end_of_data') {
+      getOrCreate(t.exitDate).exitOutcome = t.pnlPct >= 0 ? 'win' : 'loss';
     }
   });
 
   const chartData = prices.map((p, i) => ({
     ...p,
     regime: regimeDays[i]?.regime,
-    tradeMarker: entryDates.has(p.date)
-      ? ('entry' as TradeMarker)
-      : exitMap.has(p.date)
-        ? exitMap.get(p.date)
-        : undefined,
+    marker: markerMap.get(p.date),
   }));
 
   const interval = Math.max(1, Math.floor(prices.length / 6));
@@ -93,7 +112,7 @@ export default function PriceChart({ prices, regimeDays, trades }: Props) {
       >
         <p className="font-mono text-xs px-4 pb-4" style={{ color: '#334155' }}>
           PRICE —{' '}
-          <span style={{ color: '#fbbf24' }}>▲ ENTRY</span>
+          <span style={{ color: '#fbbf24' }}>▲ ENTRY (stacked = multi-slot)</span>
           {'  '}
           <span style={{ color: '#4ade80' }}>▼ WIN</span>
           {'  '}
