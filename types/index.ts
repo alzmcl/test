@@ -36,6 +36,8 @@ export interface BacktestConfig {
   trailingStopPct: number;
   /** % gain from entry before trailing stop activates (e.g. 0.05 = 5%) */
   trailingStopActivationPct: number;
+  /** Hard stop-loss: max loss from entry before forced exit (e.g. 0.10 = 10%). Applied when trailing stop has not yet activated. 0 = disabled. */
+  hardStopPct: number;
   /** % dip from last exit price required to re-enter (e.g. 0.03 = 3%) */
   reEntryDipPct: number;
   /** Minimum bars to wait before re-entry after a stop-out */
@@ -58,6 +60,7 @@ export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
   entryDipPct: 0.04,
   trailingStopPct: 0.06,
   trailingStopActivationPct: 0.05,
+  hardStopPct: 0.15,
   reEntryDipPct: 0.03,
   reEntryCooldownBars: 2,
   regimeFilter: true,
@@ -76,6 +79,7 @@ export const RANGE_MODE_CONFIG: Omit<BacktestConfig, 'portfolioSize'> = {
   entryDipPct: 0.03,
   trailingStopActivationPct: 0.05,
   trailingStopPct: 0.035,
+  hardStopPct: 0.15,
   reEntryDipPct: 0.01,   // range mode: re-enter on any small dip after cooldown
   reEntryCooldownBars: 1,
   regimeFilter: false,
@@ -86,7 +90,7 @@ export const RANGE_MODE_CONFIG: Omit<BacktestConfig, 'portfolioSize'> = {
 };
 
 export type TradeSide = 'buy' | 'sell';
-export type TradeReason = 'entry_dip' | 'trailing_stop' | 'end_of_data' | 're_entry_dip';
+export type TradeReason = 'entry_dip' | 'trailing_stop' | 'hard_stop' | 'end_of_data' | 're_entry_dip';
 
 export interface Trade {
   entryDate: number;

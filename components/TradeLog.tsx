@@ -140,6 +140,7 @@ export default function TradeLog({ trades, portfolioSize }: Props) {
                   </span>
                   <span>
                     {t.exitReason === 'trailing_stop' && badge('stop', isWin ? '#4ade80' : '#f87171')}
+                    {t.exitReason === 'hard_stop' && badge('hard stop', '#f87171')}
                     {t.exitReason === 'end_of_data' && badge('open', '#f59e0b')}
                     {t.exitReason === 're_entry_dip' && badge('re-entry', '#38bdf8')}
                   </span>

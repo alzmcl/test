@@ -6,6 +6,8 @@
  *  1. Entry dip      — price drops >= entryDipPct below rolling lookbackDays high
  *  2. Trailing stop  — activates after position gains >= trailingStopActivationPct;
  *                       then exits when price drops >= trailingStopPct below position high
+ *  2a. Hard stop     — if trailing stop has not yet activated, exits when loss from entry
+ *                       exceeds hardStopPct (0 = disabled)
  *  3. Re-entry       — after cooldown expires AND price has dipped >= reEntryDipPct
  *                       below last exit price
  *  4. Regime filter  — if regimeFilter=true, only enter in 'choppy' days;
@@ -34,6 +36,7 @@ export function runBacktest(
     entryDipPct,
     trailingStopPct,
     trailingStopActivationPct,
+    hardStopPct,
     reEntryDipPct,
     reEntryCooldownBars,
     regimeFilter,
@@ -82,6 +85,28 @@ export function runBacktest(
           const exitReason: TradeReason = 'trailing_stop';
           const grossReturn = (price - entryPrice) / entryPrice;
           const pnlPct = grossReturn - 2 * feePct; // buy + sell fee
+          equity *= 1 + pnlPct;
+          lastExitPrice = price;
+
+          trades.push({
+            ...currentTrade!,
+            exitDate: day.date,
+            exitPrice: price,
+            exitReason,
+            pnlPct,
+          });
+
+          inPosition = false;
+          currentTrade = null;
+          cooldownBarsLeft = reEntryCooldownBars;
+        }
+      } else if (hardStopPct > 0) {
+        // Hard stop-loss: protect against large losses before trailing stop activates
+        const lossFromEntry = (entryPrice - price) / entryPrice;
+        if (lossFromEntry >= hardStopPct) {
+          const exitReason: TradeReason = 'hard_stop';
+          const grossReturn = (price - entryPrice) / entryPrice;
+          const pnlPct = grossReturn - 2 * feePct;
           equity *= 1 + pnlPct;
           lastExitPrice = price;
 

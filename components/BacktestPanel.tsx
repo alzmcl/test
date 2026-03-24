@@ -130,6 +130,13 @@ export default function BacktestPanel({ result, config, onConfigChange }: Props)
               onChange={(v) => update({ trailingStopPct: v })}
             />
             <Slider
+              label="Hard stop % (0 = off)"
+              value={config.hardStopPct}
+              min={0} max={0.50} step={0.01}
+              format={(v) => v === 0 ? 'off' : (v * 100).toFixed(0) + '%'}
+              onChange={(v) => update({ hardStopPct: v })}
+            />
+            <Slider
               label="Re-entry dip %"
               value={config.reEntryDipPct}
               min={0.01} max={0.10} step={0.005}
