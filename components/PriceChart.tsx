@@ -7,7 +7,6 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  ReferenceLine,
 } from 'recharts';
 import type { PriceDay, RegimeDay, Trade } from '@/types';
 import { formatDateShort, formatDate, formatPrice } from '@/lib/btcPrice';
@@ -18,20 +17,23 @@ interface Props {
   trades: Trade[];
 }
 
+type TradeMarker = 'entry' | 'win' | 'loss';
+
 function CustomDot(props: {
   cx?: number;
   cy?: number;
-  payload?: PriceDay & { isSwing?: boolean };
+  payload?: PriceDay & { tradeMarker?: TradeMarker };
 }) {
   const { cx, cy, payload } = props;
-  if (!payload?.isSwing || cx == null || cy == null) return null;
-  return (
-    <circle
-      cx={cx} cy={cy} r={4}
-      fill="#f59e0b" stroke="#f59e0b"
-      strokeWidth={1.5} opacity={0.85}
-    />
-  );
+  if (!payload?.tradeMarker || cx == null || cy == null) return null;
+
+  if (payload.tradeMarker === 'entry') {
+    // upward triangle, cyan
+    return <polygon points={`${cx},${cy - 7} ${cx - 5},${cy + 4} ${cx + 5},${cy + 4}`} fill="#38bdf8" opacity={0.9} />;
+  }
+  const color = payload.tradeMarker === 'win' ? '#4ade80' : '#f87171';
+  // downward triangle
+  return <polygon points={`${cx},${cy + 7} ${cx - 5},${cy - 4} ${cx + 5},${cy - 4}`} fill={color} opacity={0.9} />;
 }
 
 function CustomTooltip({
@@ -39,58 +41,47 @@ function CustomTooltip({
   payload,
 }: {
   active?: boolean;
-  payload?: { payload: PriceDay & { isSwing?: boolean; regime?: string } }[];
+  payload?: { payload: PriceDay & { tradeMarker?: TradeMarker; regime?: string } }[];
 }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
     <div
       className="rounded-lg px-3.5 py-2.5 font-mono text-xs"
-      style={{
-        background: '#0f172a',
-        border: '1px solid #1e293b',
-        color: '#94a3b8',
-      }}
+      style={{ background: '#0f172a', border: '1px solid #1e293b', color: '#94a3b8' }}
     >
-      <p className="font-bold mb-1" style={{ color: '#e2e8f0' }}>
-        {formatDate(d.date)}
-      </p>
+      <p className="font-bold mb-1" style={{ color: '#e2e8f0' }}>{formatDate(d.date)}</p>
       <p style={{ color: '#38bdf8' }}>{formatPrice(d.price)}</p>
       {d.regime && (
-        <p
-          className="mt-1"
-          style={{ color: d.regime === 'trending' ? '#4ade80' : '#f59e0b' }}
-        >
+        <p className="mt-1" style={{ color: d.regime === 'trending' ? '#4ade80' : '#f59e0b' }}>
           {d.regime === 'trending' ? '↗ trending' : '↔ choppy'}
         </p>
       )}
-      {d.isSwing && (
-        <p className="mt-1" style={{ color: '#f59e0b' }}>⚡ 5%+ swing day</p>
-      )}
+      {d.tradeMarker === 'entry' && <p className="mt-1" style={{ color: '#38bdf8' }}>▲ entry</p>}
+      {d.tradeMarker === 'win'   && <p className="mt-1" style={{ color: '#4ade80' }}>▼ exit (win)</p>}
+      {d.tradeMarker === 'loss'  && <p className="mt-1" style={{ color: '#f87171' }}>▼ exit (loss)</p>}
     </div>
   );
 }
 
 export default function PriceChart({ prices, regimeDays, trades }: Props) {
-  // Merge regime info onto chart data
-  const swingSet = new Set<number>();
-  for (let i = 1; i < prices.length; i++) {
-    const change = (prices[i].price - prices[i - 1].price) / prices[i - 1].price;
-    if (Math.abs(change) >= 0.05) {
-      swingSet.add(i - 1);
-      swingSet.add(i);
+  const entryDates = new Set(trades.map((t) => t.entryDate));
+  const exitMap = new Map<number, 'win' | 'loss'>();
+  trades.forEach((t) => {
+    if (t.exitDate != null && t.pnlPct != null) {
+      exitMap.set(t.exitDate, t.pnlPct >= 0 ? 'win' : 'loss');
     }
-  }
+  });
 
   const chartData = prices.map((p, i) => ({
     ...p,
-    isSwing: swingSet.has(i),
     regime: regimeDays[i]?.regime,
+    tradeMarker: entryDates.has(p.date)
+      ? ('entry' as TradeMarker)
+      : exitMap.has(p.date)
+        ? exitMap.get(p.date)
+        : undefined,
   }));
-
-  // Entry / exit reference lines
-  const entryDates = trades.map((t) => t.entryDate);
-  const exitDates = trades.filter((t) => t.exitDate).map((t) => t.exitDate!);
 
   const interval = Math.max(1, Math.floor(prices.length / 6));
 
@@ -102,11 +93,11 @@ export default function PriceChart({ prices, regimeDays, trades }: Props) {
       >
         <p className="font-mono text-xs px-4 pb-4" style={{ color: '#334155' }}>
           PRICE —{' '}
-          <span style={{ color: '#f59e0b' }}>● SWING DAYS (≥5%)</span>
+          <span style={{ color: '#38bdf8' }}>▲ ENTRY</span>
           {'  '}
-          <span style={{ color: '#4ade80' }}>▲ ENTRY</span>
+          <span style={{ color: '#4ade80' }}>▼ WIN</span>
           {'  '}
-          <span style={{ color: '#f87171' }}>▼ EXIT</span>
+          <span style={{ color: '#f87171' }}>▼ LOSS</span>
         </p>
 
         <ResponsiveContainer width="100%" height={320}>
@@ -132,15 +123,6 @@ export default function PriceChart({ prices, regimeDays, trades }: Props) {
               width={48} domain={['auto', 'auto']}
             />
             <Tooltip content={<CustomTooltip />} />
-
-            {/* Entry lines */}
-            {entryDates.map((d) => (
-              <ReferenceLine key={`e-${d}`} x={d} stroke="#4ade80" strokeOpacity={0.4} strokeWidth={1} strokeDasharray="3 3" />
-            ))}
-            {/* Exit lines */}
-            {exitDates.map((d) => (
-              <ReferenceLine key={`x-${d}`} x={d} stroke="#f87171" strokeOpacity={0.4} strokeWidth={1} strokeDasharray="3 3" />
-            ))}
 
             <Area
               type="monotone"
