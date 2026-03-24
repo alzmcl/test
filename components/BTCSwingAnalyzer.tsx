@@ -207,7 +207,7 @@ export default function BTCSwingAnalyzer() {
           {/* Chart tab */}
           {activeTab === 'chart' && (
             <>
-              <PriceChart prices={filteredPrices} regimeDays={regimeDays} trades={result?.trades ?? []} />
+              <PriceChart prices={filteredPrices} regimeDays={regimeDays} trades={result?.trades ?? []} numSlots={config.numSlots ?? 1} />
               <BacktestPanel
                 result={result}
                 config={config}
