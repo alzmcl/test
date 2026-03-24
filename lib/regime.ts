@@ -1,98 +1,34 @@
 /**
  * Regime detection
  * ────────────────
- * Classifies each day as 'trending' or 'choppy' using two signals:
+ * Classifies each day as 'trending' or 'choppy' using MA slope:
  *
- *  1. ADX proxy   — measures directional movement strength via smoothed DM+/DM-.
- *                   ADX-proxy >= adxThreshold  ⇒ trending
+ *   1. Compute a simple moving average of `maPeriod` days.
+ *   2. Measure how much the MA has moved over the last `maPeriod` days
+ *      as a fraction of the earlier MA value.
+ *   3. If |slope| >= slopeThreshold → 'trending' (strong directional move).
+ *      Otherwise → 'choppy' (ranging / mean-reverting).
  *
- *  2. Volatility  — 14-day rolling std-dev of daily log-returns, annualised.
- *                   High vol alone doesn’t mean trending, so it’s used as a
- *                   secondary filter: if vol is very low the market may be
- *                   ranging even if ADX ticks up.
- *
- * Both signals must agree (ADX high AND vol above floor) to label 'trending'.
+ * No OHLCV needed. No double-smoothing lag. Threshold is in plain % terms
+ * (e.g. 0.05 = MA must have moved 5% over the lookback window).
  */
 
 import type { PriceDay, Regime, RegimeDay } from '@/types';
 
 // ─── Config ────────────────────────────────────────────────────────────
 
-const ADX_PERIOD = 14;
-/** ADX-proxy threshold above which we consider the market trending */
-const ADX_TRENDING_THRESHOLD = 25;
-/** Minimum annualised volatility to permit 'trending' label (filters dead range) */
-const MIN_VOL_FLOOR = 0.30; // 30% pa
+const MA_PERIOD = 20;
+/** Fractional move of MA over maPeriod days to qualify as trending */
+const SLOPE_THRESHOLD = 0.05; // 5%
 
-// ─── Maths helpers ───────────────────────────────────────────────────
+// ─── Simple moving average ──────────────────────────────────────────────
 
-function smma(values: number[], period: number): number[] {
-  /** Smoothed moving average (Wilder’s) */
-  const result: number[] = Array(values.length).fill(0);
-  if (values.length < period) return result;
-
-  // Seed with simple average
-  let sum = 0;
-  for (let i = 0; i < period; i++) sum += values[i];
-  result[period - 1] = sum / period;
-
-  for (let i = period; i < values.length; i++) {
-    result[i] = (result[i - 1] * (period - 1) + values[i]) / period;
-  }
-  return result;
-}
-
-function stddev(arr: number[]): number {
-  if (arr.length === 0) return 0;
-  const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
-  const variance = arr.reduce((acc, v) => acc + (v - mean) ** 2, 0) / arr.length;
-  return Math.sqrt(variance);
-}
-
-// ─── ADX proxy (price-only, no OHLCV) ──────────────────────────────────
-
-/**
- * Without OHLCV we approximate DM+ / DM- from consecutive close prices:
- *   DM+ = max(close[i] - close[i-1], 0)
- *   DM- = max(close[i-1] - close[i], 0)
- * Then ADX-proxy = SMMA(|DM+ - DM-| / (DM+ + DM-)) * 100
- */
-function computeAdxProxy(prices: number[], period: number): number[] {
-  const n = prices.length;
-  const dmPlus: number[] = Array(n).fill(0);
-  const dmMinus: number[] = Array(n).fill(0);
-
-  for (let i = 1; i < n; i++) {
-    const diff = prices[i] - prices[i - 1];
-    dmPlus[i] = Math.max(diff, 0);
-    dmMinus[i] = Math.max(-diff, 0);
-  }
-
-  const smDmPlus = smma(dmPlus, period);
-  const smDmMinus = smma(dmMinus, period);
-
-  const dx: number[] = Array(n).fill(0);
-  for (let i = 0; i < n; i++) {
-    const total = smDmPlus[i] + smDmMinus[i];
-    dx[i] = total === 0 ? 0 : (Math.abs(smDmPlus[i] - smDmMinus[i]) / total) * 100;
-  }
-
-  return smma(dx, period);
-}
-
-// ─── Rolling volatility ─────────────────────────────────────────────────
-
-function computeRollingVol(prices: number[], period: number): number[] {
-  const n = prices.length;
-  const result: number[] = Array(n).fill(0);
-
-  for (let i = period; i < n; i++) {
-    const window = prices.slice(i - period, i + 1);
-    const logReturns = window
-      .slice(1)
-      .map((p, j) => Math.log(p / window[j]));
-    // Annualise: daily std * sqrt(365)
-    result[i] = stddev(logReturns) * Math.sqrt(365);
+function computeSMA(prices: number[], period: number): number[] {
+  const result: number[] = Array(prices.length).fill(0);
+  for (let i = period - 1; i < prices.length; i++) {
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += prices[j];
+    result[i] = sum / period;
   }
   return result;
 }
@@ -101,25 +37,33 @@ function computeRollingVol(prices: number[], period: number): number[] {
 
 export function detectRegimes(
   prices: PriceDay[],
-  adxPeriod = ADX_PERIOD,
-  adxThreshold = ADX_TRENDING_THRESHOLD
+  maPeriod = MA_PERIOD,
+  slopeThresholdPct = SLOPE_THRESHOLD * 100 // passed in as whole number, e.g. 25 → reuse old param
 ): RegimeDay[] {
   const closes = prices.map((p) => p.price);
-  const adxProxy = computeAdxProxy(closes, adxPeriod);
-  const vol = computeRollingVol(closes, adxPeriod);
+  const ma = computeSMA(closes, maPeriod);
+  // Normalise: callers pass adxThreshold as a whole number (e.g. 25).
+  // We interpret it as a % slope threshold (5 → 5% move over maPeriod days).
+  const threshold = slopeThresholdPct / 100;
 
   return prices.map((p, i) => {
     let regime: Regime = 'unknown';
-    if (i >= adxPeriod * 2) {
-      const isTrending =
-        adxProxy[i] >= adxThreshold && vol[i] >= MIN_VOL_FLOOR;
+    if (i >= maPeriod * 2) {
+      const maNow = ma[i];
+      const maThen = ma[i - maPeriod];
+      const slope = maThen === 0 ? 0 : (maNow - maThen) / maThen;
+      const isTrending = Math.abs(slope) >= threshold;
       regime = isTrending ? 'trending' : 'choppy';
     }
     return {
       ...p,
       regime,
-      adxProxy: Math.round(adxProxy[i] * 10) / 10,
-      volatility: Math.round(vol[i] * 1000) / 10, // stored as %, e.g. 65.3
+      adxProxy: Math.round(Math.abs(
+        ma[i] && ma[i - maPeriod]
+          ? ((ma[i] - ma[i - maPeriod]) / ma[i - maPeriod]) * 100
+          : 0
+      ) * 10) / 10,
+      volatility: 0,
     };
   });
 }

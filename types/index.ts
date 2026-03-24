@@ -48,9 +48,9 @@ export interface BacktestConfig {
   lookbackDays: number;
   /** Exchange fee per side (e.g. 0.001 = 0.1%) */
   feePct: number;
-  /** ADX rolling window in days */
+  /** MA period for regime slope calculation (days) */
   regimeAdxPeriod: number;
-  /** ADX-proxy threshold above which market is 'trending' */
+  /** MA slope threshold % — if |MA moved this much over maPeriod days| → trending */
   regimeAdxThreshold: number;
   /** Portfolio starting size in USD */
   portfolioSize: number;
@@ -66,8 +66,8 @@ export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
   regimeFilter: true,
   lookbackDays: 14,
   feePct: 0.001,
-  regimeAdxPeriod: 14,
-  regimeAdxThreshold: 25,
+  regimeAdxPeriod: 20,
+  regimeAdxThreshold: 5,
   portfolioSize: 10000,
 };
 
@@ -85,8 +85,8 @@ export const RANGE_MODE_CONFIG: Omit<BacktestConfig, 'portfolioSize'> = {
   regimeFilter: false,
   lookbackDays: 7,
   feePct: 0.001,
-  regimeAdxPeriod: 14,
-  regimeAdxThreshold: 25,
+  regimeAdxPeriod: 20,
+  regimeAdxThreshold: 5,
 };
 
 export type TradeSide = 'buy' | 'sell';

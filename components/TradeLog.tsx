@@ -153,7 +153,7 @@ export default function TradeLog({ trades, portfolioSize }: Props) {
                     {(pnl >= 0 ? '+' : '') + (pnl * 100).toFixed(2) + '%'}
                   </span>
                   <span style={{ color: isWin ? '#4ade80' : '#f87171', fontWeight: 600 }}>
-                    {(pnlDollar >= 0 ? '+' : '') + formatPrice(Math.abs(pnlDollar))}
+                    {(pnlDollar >= 0 ? '+' : '-') + formatPrice(Math.abs(pnlDollar))}
                   </span>
                 </div>
               );

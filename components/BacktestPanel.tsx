@@ -160,17 +160,17 @@ export default function BacktestPanel({ result, config, onConfigChange }: Props)
 
             <SliderGroup label="Regime" />
             <Slider
-              label="ADX period"
+              label="MA period"
               value={config.regimeAdxPeriod}
-              min={5} max={30} step={1}
+              min={5} max={50} step={1}
               format={(v) => v + 'd'}
               onChange={(v) => update({ regimeAdxPeriod: v })}
             />
             <Slider
-              label="ADX threshold"
+              label="Slope threshold %"
               value={config.regimeAdxThreshold}
-              min={10} max={40} step={1}
-              format={(v) => v.toString()}
+              min={1} max={20} step={1}
+              format={(v) => v + '%'}
               onChange={(v) => update({ regimeAdxThreshold: v })}
             />
           </div>
