@@ -71,7 +71,7 @@ export default function BTCSwingAnalyzer() {
   const swings = filteredPrices.reduce(
     (acc, cur, i) => {
       if (i === 0) return acc;
-      const prev = prices[i - 1];
+      const prev = filteredPrices[i - 1];
       const change = (cur.price - prev.price) / prev.price;
       if (Math.abs(change) >= THRESHOLD) {
         acc.push({
