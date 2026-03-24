@@ -38,6 +38,14 @@ function Slider({
   );
 }
 
+function SliderGroup({ label }: { label: string }) {
+  return (
+    <p className="text-xs font-mono uppercase tracking-widest pt-1" style={{ color: '#334155' }}>
+      {label}
+    </p>
+  );
+}
+
 export default function BacktestPanel({ result, config, onConfigChange }: Props) {
   const s = result?.stats;
 
@@ -81,7 +89,8 @@ export default function BacktestPanel({ result, config, onConfigChange }: Props)
 
         <div className="grid md:grid-cols-2 gap-0">
           {/* Controls */}
-          <div className="p-5 border-r flex flex-col gap-5" style={{ borderColor: '#0f172a' }}>
+          <div className="p-5 border-r flex flex-col gap-4" style={{ borderColor: '#0f172a' }}>
+            <SliderGroup label="Entry / Exit" />
             <Slider
               label="Entry dip %"
               value={config.entryDipPct}
@@ -90,11 +99,25 @@ export default function BacktestPanel({ result, config, onConfigChange }: Props)
               onChange={(v) => update({ entryDipPct: v })}
             />
             <Slider
+              label="Trailing stop activation %"
+              value={config.trailingStopActivationPct}
+              min={0.01} max={0.15} step={0.005}
+              format={(v) => (v * 100).toFixed(1) + '%'}
+              onChange={(v) => update({ trailingStopActivationPct: v })}
+            />
+            <Slider
               label="Trailing stop %"
               value={config.trailingStopPct}
               min={0.02} max={0.15} step={0.005}
               format={(v) => (v * 100).toFixed(1) + '%'}
               onChange={(v) => update({ trailingStopPct: v })}
+            />
+            <Slider
+              label="Re-entry dip %"
+              value={config.reEntryDipPct}
+              min={0.01} max={0.10} step={0.005}
+              format={(v) => (v * 100).toFixed(1) + '%'}
+              onChange={(v) => update({ reEntryDipPct: v })}
             />
             <Slider
               label="Lookback window"
@@ -110,24 +133,59 @@ export default function BacktestPanel({ result, config, onConfigChange }: Props)
               format={(v) => v + ' bars'}
               onChange={(v) => update({ reEntryCooldownBars: v })}
             />
+
+            <SliderGroup label="Regime" />
+            <Slider
+              label="ADX period"
+              value={config.regimeAdxPeriod}
+              min={5} max={30} step={1}
+              format={(v) => v + 'd'}
+              onChange={(v) => update({ regimeAdxPeriod: v })}
+            />
+            <Slider
+              label="ADX threshold"
+              value={config.regimeAdxThreshold}
+              min={10} max={40} step={1}
+              format={(v) => v.toString()}
+              onChange={(v) => update({ regimeAdxThreshold: v })}
+            />
           </div>
 
           {/* Stats */}
           {s && (
             <div className="p-5">
+              {/* Portfolio size input */}
+              <div className="mb-4 flex items-center gap-3">
+                <span className="text-xs font-mono" style={{ color: '#64748b' }}>Portfolio size</span>
+                <input
+                  type="number"
+                  value={config.portfolioSize}
+                  min={100}
+                  step={1000}
+                  onChange={(e) => update({ portfolioSize: Number(e.target.value) })}
+                  className="text-xs font-mono px-2 py-1 rounded w-28"
+                  style={{
+                    background: '#0f172a',
+                    border: '1px solid #1e293b',
+                    color: '#94a3b8',
+                  }}
+                />
+              </div>
+
               <div
                 className="grid grid-cols-2 gap-x-6 gap-y-3"
                 style={{ fontFamily: 'DM Mono,monospace' }}
               >
                 {([
-                  ['Trades',        s.totalTrades],
-                  ['Win rate',      s.winRate + '%'],
-                  ['Avg win',       '+' + s.avgWinPct + '%'],
-                  ['Avg loss',      s.avgLossPct + '%'],
-                  ['Total return',  (s.totalReturnPct >= 0 ? '+' : '') + s.totalReturnPct + '%'],
-                  ['Max drawdown',  '-' + s.maxDrawdownPct + '%'],
-                  ['Sharpe (proxy)',s.sharpeProxy],
-                  ['In trending',   s.tradesInTrending + ' trades'],
+                  ['Trades',         s.totalTrades],
+                  ['Win rate',       s.winRate + '%'],
+                  ['Avg win',        '+' + s.avgWinPct + '%'],
+                  ['Avg loss',       s.avgLossPct + '%'],
+                  ['Total return',   (s.totalReturnPct >= 0 ? '+' : '') + s.totalReturnPct + '%'],
+                  ['Max drawdown',   '-' + s.maxDrawdownPct + '%'],
+                  ['Sharpe (proxy)', s.sharpeProxy],
+                  ['In choppy',      s.tradesInChoppy + ' trades'],
+                  ['Final value',    formatPrice(s.portfolioFinalValue)],
                 ] as [string, string | number][]).map(([k, v]) => (
                   <div key={k}>
                     <p className="text-xs mb-0.5" style={{ color: '#334155' }}>{k}</p>

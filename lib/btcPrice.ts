@@ -1,55 +1,57 @@
 import type { PriceDay } from '@/types';
 
-const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
+const EODHD_BASE = 'https://eodhd.com/api/eod';
 
 /**
- * Fetch daily BTC/USD closing prices via CoinGecko's free /market_chart/range
- * endpoint.  Returns data sorted oldest-first.
+ * Fetch daily BTC/USD closing prices via EODHD's end-of-day API.
+ * Returns data sorted oldest-first.
  *
  * @param days  How many days back to fetch (default 180 = ~6 months)
  */
 export async function fetchBTCPrices(days = 180): Promise<PriceDay[]> {
-  const to = Math.floor(Date.now() / 1000);
-  const from = to - days * 86_400;
+  const apiKey = process.env.EODHD_API_KEY;
+  if (!apiKey) throw new Error('EODHD_API_KEY is not set');
 
-  // Optionally inject a CoinGecko Pro key for higher rate limits
-  const apiKey = process.env.COINGECKO_API_KEY;
-  const headers: HeadersInit = apiKey
-    ? { 'x-cg-pro-api-key': apiKey }
-    : {};
+  const to = new Date();
+  const from = new Date(Date.now() - days * 86_400_000);
+
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
 
   const url =
-    `${COINGECKO_BASE}/coins/bitcoin/market_chart/range` +
-    `?vs_currency=usd&from=${from}&to=${to}`;
+    `${EODHD_BASE}/BTC-USD.CC` +
+    `?api_token=${apiKey}&fmt=json&from=${fmt(from)}&to=${fmt(to)}`;
 
   const res = await fetch(url, {
-    headers,
     // Next.js 14 fetch cache: revalidate at most once per hour
     next: { revalidate: 3600 },
   });
 
   if (!res.ok) {
     throw new Error(
-      `CoinGecko API error ${res.status}: ${await res.text().catch(() => '')}`
+      `EODHD API error ${res.status}: ${await res.text().catch(() => '')}`
     );
   }
 
-  const json = (await res.json()) as { prices: [number, number][] };
+  const json = (await res.json()) as Array<{
+    date: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    adjusted_close: number;
+    volume: number;
+  }>;
 
-  return json.prices
-    .map(([ts, price]) => ({
-      date: ts,
-      price: Math.round(price),
+  return json
+    .map((row) => ({
+      date: new Date(row.date).getTime(),
+      price: Math.round(row.adjusted_close),
     }))
     .sort((a, b) => a.date - b.date);
 }
 
 /**
- * Thin wrapper used by the API route — tries Supabase cache first,
- * then falls back to CoinGecko if data is stale / missing.
- *
- * For the scaffold this just calls CoinGecko directly.  Wire up Supabase
- * persistence in the next phase.
+ * Thin wrapper used by the API route.
  */
 export async function getPrices(days = 180): Promise<PriceDay[]> {
   return fetchBTCPrices(days);

@@ -4,11 +4,12 @@
  * Strategy rules (all configurable via BacktestConfig):
  *
  *  1. Entry dip      — price drops >= entryDipPct below rolling lookbackDays high
- *  2. Trailing stop  — price drops >= trailingStopPct below the highest close
- *                       since entry  → exit, start cooldown
- *  3. Re-entry       — after cooldown expires, wait for next dip signal
- *  4. Regime filter  — if regimeFilter=true, only enter in 'trending' days;
- *                       ignore dip signals on 'choppy' days
+ *  2. Trailing stop  — activates after position gains >= trailingStopActivationPct;
+ *                       then exits when price drops >= trailingStopPct below position high
+ *  3. Re-entry       — after cooldown expires AND price has dipped >= reEntryDipPct
+ *                       below last exit price
+ *  4. Regime filter  — if regimeFilter=true, only enter in 'choppy' days;
+ *                       ignore dip signals on 'trending' days
  *
  * One position at a time (no pyramiding).
  */
@@ -32,13 +33,18 @@ export function runBacktest(
   const {
     entryDipPct,
     trailingStopPct,
+    trailingStopActivationPct,
+    reEntryDipPct,
     reEntryCooldownBars,
     regimeFilter,
     lookbackDays,
     feePct,
+    regimeAdxPeriod,
+    regimeAdxThreshold,
+    portfolioSize,
   } = config;
 
-  const regimeDays = detectRegimes(prices);
+  const regimeDays = detectRegimes(prices, regimeAdxPeriod, regimeAdxThreshold);
   const n = regimeDays.length;
 
   const trades: Trade[] = [];
@@ -49,6 +55,7 @@ export function runBacktest(
   let entryPrice = 0;
   let positionHigh = 0;       // highest close since entry
   let cooldownBarsLeft = 0;
+  let lastExitPrice = 0;      // track for re-entry dip gate
   let currentTrade: Omit<Trade, 'exitDate' | 'exitPrice' | 'exitReason' | 'pnlPct'> | null = null;
 
   for (let i = lookbackDays; i < n; i++) {
@@ -65,33 +72,41 @@ export function runBacktest(
       // Update trailing high
       if (price > positionHigh) positionHigh = price;
 
-      // Check trailing stop
-      const stopLevel = positionHigh * (1 - trailingStopPct);
-      if (price <= stopLevel) {
-        const exitReason: TradeReason = 'trailing_stop';
-        const grossReturn = (price - entryPrice) / entryPrice;
-        const pnlPct = grossReturn - 2 * feePct; // buy + sell fee
-        equity *= 1 + pnlPct;
+      // Trailing stop only activates after position has gained trailingStopActivationPct
+      const gainFromEntry = (positionHigh - entryPrice) / entryPrice;
+      const trailingActive = gainFromEntry >= trailingStopActivationPct;
 
-        trades.push({
-          ...currentTrade!,
-          exitDate: day.date,
-          exitPrice: price,
-          exitReason,
-          pnlPct,
-        });
+      if (trailingActive) {
+        const stopLevel = positionHigh * (1 - trailingStopPct);
+        if (price <= stopLevel) {
+          const exitReason: TradeReason = 'trailing_stop';
+          const grossReturn = (price - entryPrice) / entryPrice;
+          const pnlPct = grossReturn - 2 * feePct; // buy + sell fee
+          equity *= 1 + pnlPct;
+          lastExitPrice = price;
 
-        inPosition = false;
-        currentTrade = null;
-        cooldownBarsLeft = reEntryCooldownBars;
+          trades.push({
+            ...currentTrade!,
+            exitDate: day.date,
+            exitPrice: price,
+            exitReason,
+            pnlPct,
+          });
+
+          inPosition = false;
+          currentTrade = null;
+          cooldownBarsLeft = reEntryCooldownBars;
+        }
       }
     } else {
       // Not in position — look for entry
       if (cooldownBarsLeft === 0) {
-        const regimeOk = !regimeFilter || day.regime === 'trending';
+        const regimeOk = !regimeFilter || day.regime === 'choppy';
         const dipTriggered = price <= windowHigh * (1 - entryDipPct);
+        // Re-entry gate: if we have a prior exit, require dip below that exit price
+        const reEntryOk = lastExitPrice === 0 || price <= lastExitPrice * (1 - reEntryDipPct);
 
-        if (regimeOk && dipTriggered) {
+        if (regimeOk && dipTriggered && reEntryOk) {
           entryPrice = price;
           positionHigh = price;
           inPosition = true;
@@ -123,7 +138,7 @@ export function runBacktest(
     });
   }
 
-  const stats = computeStats(trades, equityCurve);
+  const stats = computeStats(trades, equityCurve, portfolioSize);
 
   return { trades, equityCurve, stats };
 }
@@ -132,7 +147,8 @@ export function runBacktest(
 
 function computeStats(
   trades: Trade[],
-  equityCurve: { date: number; equity: number }[]
+  equityCurve: { date: number; equity: number }[],
+  portfolioSize: number
 ): BacktestStats {
   const closedTrades = trades.filter((t) => t.pnlPct !== null);
   const wins = closedTrades.filter((t) => (t.pnlPct ?? 0) > 0);
@@ -179,6 +195,8 @@ function computeStats(
   const tradesInTrending = trades.filter((t) => t.regime === 'trending').length;
   const tradesInChoppy = trades.filter((t) => t.regime === 'choppy').length;
 
+  const portfolioFinalValue = Math.round(portfolioSize * (1 + totalReturnPct));
+
   return {
     totalTrades: closedTrades.length,
     winRate: Math.round(winRate * 1000) / 10,     // store as %
@@ -189,5 +207,6 @@ function computeStats(
     sharpeProxy: Math.round(sharpeProxy * 100) / 100,
     tradesInTrending,
     tradesInChoppy,
+    portfolioFinalValue,
   };
 }

@@ -57,7 +57,7 @@ function stddev(arr: number[]): number {
  *   DM- = max(close[i-1] - close[i], 0)
  * Then ADX-proxy = SMMA(|DM+ - DM-| / (DM+ + DM-)) * 100
  */
-function computeAdxProxy(prices: number[]): number[] {
+function computeAdxProxy(prices: number[], period: number): number[] {
   const n = prices.length;
   const dmPlus: number[] = Array(n).fill(0);
   const dmMinus: number[] = Array(n).fill(0);
@@ -68,8 +68,8 @@ function computeAdxProxy(prices: number[]): number[] {
     dmMinus[i] = Math.max(-diff, 0);
   }
 
-  const smDmPlus = smma(dmPlus, ADX_PERIOD);
-  const smDmMinus = smma(dmMinus, ADX_PERIOD);
+  const smDmPlus = smma(dmPlus, period);
+  const smDmMinus = smma(dmMinus, period);
 
   const dx: number[] = Array(n).fill(0);
   for (let i = 0; i < n; i++) {
@@ -77,12 +77,12 @@ function computeAdxProxy(prices: number[]): number[] {
     dx[i] = total === 0 ? 0 : (Math.abs(smDmPlus[i] - smDmMinus[i]) / total) * 100;
   }
 
-  return smma(dx, ADX_PERIOD);
+  return smma(dx, period);
 }
 
 // ─── Rolling volatility ─────────────────────────────────────────────────
 
-function computeRollingVol(prices: number[], period = ADX_PERIOD): number[] {
+function computeRollingVol(prices: number[], period: number): number[] {
   const n = prices.length;
   const result: number[] = Array(n).fill(0);
 
@@ -99,16 +99,20 @@ function computeRollingVol(prices: number[], period = ADX_PERIOD): number[] {
 
 // ─── Public API ─────────────────────────────────────────────────────────
 
-export function detectRegimes(prices: PriceDay[]): RegimeDay[] {
+export function detectRegimes(
+  prices: PriceDay[],
+  adxPeriod = ADX_PERIOD,
+  adxThreshold = ADX_TRENDING_THRESHOLD
+): RegimeDay[] {
   const closes = prices.map((p) => p.price);
-  const adxProxy = computeAdxProxy(closes);
-  const vol = computeRollingVol(closes);
+  const adxProxy = computeAdxProxy(closes, adxPeriod);
+  const vol = computeRollingVol(closes, adxPeriod);
 
   return prices.map((p, i) => {
     let regime: Regime = 'unknown';
-    if (i >= ADX_PERIOD * 2) {
+    if (i >= adxPeriod * 2) {
       const isTrending =
-        adxProxy[i] >= ADX_TRENDING_THRESHOLD && vol[i] >= MIN_VOL_FLOOR;
+        adxProxy[i] >= adxThreshold && vol[i] >= MIN_VOL_FLOOR;
       regime = isTrending ? 'trending' : 'choppy';
     }
     return {

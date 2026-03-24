@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import type { PriceDay, BacktestConfig, BacktestResult } from '@/types';
 import { DEFAULT_BACKTEST_CONFIG } from '@/types';
 import { detectRegimes } from '@/lib/regime';
@@ -10,8 +10,19 @@ import StatCards from './StatCards';
 import PriceChart from './PriceChart';
 import SwingTable from './SwingTable';
 import BacktestPanel from './BacktestPanel';
+import TradeLog from './TradeLog';
+import EquityCurve from './EquityCurve';
+import Optimizer from './Optimizer';
 
 const THRESHOLD = 0.05;
+type Tab = 'chart' | 'trades' | 'equity' | 'optimizer';
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'chart',     label: 'Chart' },
+  { id: 'trades',    label: 'Trades' },
+  { id: 'equity',    label: 'Equity' },
+  { id: 'optimizer', label: 'Optimizer' },
+];
 
 export default function BTCSwingAnalyzer() {
   const [prices, setPrices] = useState<PriceDay[]>([]);
@@ -20,8 +31,9 @@ export default function BTCSwingAnalyzer() {
   const [config, setConfig] = useState<BacktestConfig>(DEFAULT_BACKTEST_CONFIG);
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [days, setDays] = useState(180);
+  const [activeTab, setActiveTab] = useState<Tab>('chart');
 
-  // ── Fetch prices from our Next.js API route (which calls CoinGecko)
+  // ── Fetch prices from our Next.js API route
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -49,7 +61,7 @@ export default function BTCSwingAnalyzer() {
     setResult(res);
   }, [prices, config]);
 
-  // ── Derive 5%+ swing events for the table (same logic as artifact)
+  // ── Derive 5%+ swing events for the table
   const swings = prices.reduce(
     (acc, cur, i) => {
       if (i === 0) return acc;
@@ -75,7 +87,9 @@ export default function BTCSwingAnalyzer() {
     }[]
   );
 
-  const regimeDays = prices.length > 0 ? detectRegimes(prices) : [];
+  const regimeDays = prices.length > 0
+    ? detectRegimes(prices, config.regimeAdxPeriod, config.regimeAdxThreshold)
+    : [];
 
   const stats = prices.length
     ? {
@@ -101,7 +115,7 @@ export default function BTCSwingAnalyzer() {
           background: 'linear-gradient(180deg,#080e1a 0%,#060b14 100%)',
         }}
       >
-        <div className="flex items-baseline gap-3 mb-2">
+        <div className="flex items-baseline gap-3 mb-2 flex-wrap">
           <span
             className="text-xs font-mono uppercase tracking-widest"
             style={{ color: '#f59e0b' }}
@@ -158,35 +172,94 @@ export default function BTCSwingAnalyzer() {
       {!loading && !error && stats && (
         <>
           <StatCards stats={stats} />
-          <PriceChart prices={prices} regimeDays={regimeDays} trades={result?.trades ?? []} />
-          <BacktestPanel
-            result={result}
-            config={config}
-            onConfigChange={setConfig}
-          />
-          <SwingTable swings={swings} />
 
-          {/* Reality check */}
-          <div className="px-8 pt-5">
-            <div
-              className="rounded-xl p-5 flex gap-4"
-              style={{ background: '#12100a', border: '1px solid #292524' }}
-            >
-              <span className="text-xl leading-snug">⚠️</span>
-              <div>
-                <p className="text-sm font-semibold mb-1.5" style={{ color: '#fbbf24' }}>
-                  Strategy Reality Check
-                </p>
-                <p className="text-xs leading-relaxed" style={{ color: '#78716c' }}>
-                  Swings are visible <em>in hindsight</em>. Real-time execution is harder: you
-                  don’t know if a 3% dip becomes 5% or reverses. Exchange fees (0.1–0.5%),
-                  slippage, and capital-gains tax all erode theoretical returns. The regime
-                  filter improves signal quality but doesn’t eliminate losses.
-                  Most retail swing strategies underperform a simple hold.
-                </p>
-              </div>
-            </div>
+          {/* Tab bar */}
+          <div
+            className="flex px-8 pt-6 gap-1 overflow-x-auto"
+            style={{ borderBottom: '1px solid #0f172a' }}
+          >
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="px-4 py-2 text-xs font-mono rounded-t transition-colors whitespace-nowrap"
+                style={{
+                  background: activeTab === tab.id ? '#0c1626' : 'transparent',
+                  color: activeTab === tab.id ? '#38bdf8' : '#475569',
+                  border: activeTab === tab.id ? '1px solid #1e293b' : '1px solid transparent',
+                  borderBottom: activeTab === tab.id ? '1px solid #0c1626' : '1px solid transparent',
+                  marginBottom: activeTab === tab.id ? '-1px' : '0',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
+
+          {/* Chart tab */}
+          {activeTab === 'chart' && (
+            <>
+              <PriceChart prices={prices} regimeDays={regimeDays} trades={result?.trades ?? []} />
+              <BacktestPanel
+                result={result}
+                config={config}
+                onConfigChange={setConfig}
+              />
+              <SwingTable swings={swings} />
+
+              {/* Reality check */}
+              <div className="px-8 pt-5">
+                <div
+                  className="rounded-xl p-5 flex gap-4"
+                  style={{ background: '#12100a', border: '1px solid #292524' }}
+                >
+                  <span className="text-xl leading-snug">⚠️</span>
+                  <div>
+                    <p className="text-sm font-semibold mb-1.5" style={{ color: '#fbbf24' }}>
+                      Strategy Reality Check
+                    </p>
+                    <p className="text-xs leading-relaxed" style={{ color: '#78716c' }}>
+                      Swings are visible <em>in hindsight</em>. Real-time execution is harder: you
+                      don't know if a 3% dip becomes 5% or reverses. Exchange fees (0.1–0.5%),
+                      slippage, and capital-gains tax all erode theoretical returns. The regime
+                      filter improves signal quality but doesn't eliminate losses.
+                      Most retail swing strategies underperform a simple hold.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Trades tab */}
+          {activeTab === 'trades' && (
+            <TradeLog
+              trades={result?.trades ?? []}
+              portfolioSize={config.portfolioSize}
+            />
+          )}
+
+          {/* Equity tab */}
+          {activeTab === 'equity' && (
+            <EquityCurve
+              equityCurve={result?.equityCurve ?? []}
+              prices={prices}
+              lookbackDays={config.lookbackDays}
+              portfolioSize={config.portfolioSize}
+            />
+          )}
+
+          {/* Optimizer tab */}
+          {activeTab === 'optimizer' && (
+            <Optimizer
+              prices={prices}
+              config={config}
+              onConfigApply={(c) => {
+                setConfig(c);
+                setActiveTab('chart');
+              }}
+            />
+          )}
         </>
       )}
     </div>
