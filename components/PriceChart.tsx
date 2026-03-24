@@ -29,7 +29,7 @@ function CustomDot(props: {
 
   if (payload.tradeMarker === 'entry') {
     // upward triangle, cyan
-    return <polygon points={`${cx},${cy - 7} ${cx - 5},${cy + 4} ${cx + 5},${cy + 4}`} fill="#38bdf8" opacity={0.9} />;
+    return <polygon points={`${cx},${cy - 7} ${cx - 5},${cy + 4} ${cx + 5},${cy + 4}`} fill="#fbbf24" opacity={0.9} />;
   }
   const color = payload.tradeMarker === 'win' ? '#4ade80' : '#f87171';
   // downward triangle
@@ -57,7 +57,7 @@ function CustomTooltip({
           {d.regime === 'trending' ? '↗ trending' : '↔ choppy'}
         </p>
       )}
-      {d.tradeMarker === 'entry' && <p className="mt-1" style={{ color: '#38bdf8' }}>▲ entry</p>}
+      {d.tradeMarker === 'entry' && <p className="mt-1" style={{ color: '#fbbf24' }}>▲ entry</p>}
       {d.tradeMarker === 'win'   && <p className="mt-1" style={{ color: '#4ade80' }}>▼ exit (win)</p>}
       {d.tradeMarker === 'loss'  && <p className="mt-1" style={{ color: '#f87171' }}>▼ exit (loss)</p>}
     </div>
@@ -93,7 +93,7 @@ export default function PriceChart({ prices, regimeDays, trades }: Props) {
       >
         <p className="font-mono text-xs px-4 pb-4" style={{ color: '#334155' }}>
           PRICE —{' '}
-          <span style={{ color: '#38bdf8' }}>▲ ENTRY</span>
+          <span style={{ color: '#fbbf24' }}>▲ ENTRY</span>
           {'  '}
           <span style={{ color: '#4ade80' }}>▼ WIN</span>
           {'  '}
