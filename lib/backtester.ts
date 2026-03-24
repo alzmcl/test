@@ -70,9 +70,14 @@ export function runBacktest(
     cashYieldPct = 0,
     numSlots = 1,
     slotDipIncrement = 0.02,
+    slot2AllocPct = 50,
   } = config;
 
-  const allocationPerSlot = Math.min(1, allocationPct / 100) / numSlots;
+  // S1 uses allocationPct / numSlots (equal split if slot2AllocPct not set);
+  // S2+ each use slot2AllocPct / 100 of total equity.
+  const s1Alloc = Math.min(1, allocationPct / 100) / numSlots;
+  const s2Alloc = Math.min(1, slot2AllocPct / 100);
+  const slotAllocations = Array.from({ length: numSlots }, (_, s) => s === 0 ? s1Alloc : s2Alloc);
   const dailyCashRate = Math.pow(1 + cashYieldPct / 100, 1 / 365) - 1;
 
   const regimeDays = detectRegimes(prices, regimeAdxPeriod, regimeAdxThreshold);
@@ -159,7 +164,7 @@ export function runBacktest(
 
         if (regimeOk && dipTriggered && reEntryOk && prevSlotIn) {
           const totalEquity = cashValue + slots.reduce((sum, sl) => sum + sl.btcValue, 0);
-          const deployAmount = totalEquity * allocationPerSlot;
+          const deployAmount = totalEquity * slotAllocations[s];
 
           if (deployAmount <= cashValue) {
             slot.btcValue = deployAmount * (1 - feePct); // entry fee

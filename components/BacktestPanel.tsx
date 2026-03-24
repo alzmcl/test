@@ -169,17 +169,26 @@ export default function BacktestPanel({ result, config, onConfigChange }: Props)
             <Slider
               label="Slot dip increment %"
               value={config.slotDipIncrement}
-              min={0.005} max={0.08} step={0.005}
+              min={0.005} max={0.15} step={0.005}
               format={(v) => (v * 100).toFixed(1) + '%'}
               onChange={(v) => update({ slotDipIncrement: v })}
             />
             <Slider
-              label="Allocation per trade %"
+              label="S1 allocation %"
               value={config.allocationPct}
               min={10} max={100} step={5}
               format={(v) => v + '%'}
               onChange={(v) => update({ allocationPct: v })}
             />
+            {config.numSlots > 1 && (
+              <Slider
+                label="S2+ allocation %"
+                value={config.slot2AllocPct ?? 50}
+                min={5} max={100} step={5}
+                format={(v) => v + '%'}
+                onChange={(v) => update({ slot2AllocPct: v })}
+              />
+            )}
             <Slider
               label="Cash yield % (annual)"
               value={config.cashYieldPct}

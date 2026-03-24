@@ -62,6 +62,8 @@ export interface BacktestConfig {
   numSlots: number;
   /** Additional dip % required for each successive slot (e.g. 0.02 = slot 1 needs 2% more dip than slot 0). */
   slotDipIncrement: number;
+  /** % of portfolio deployed per S2+ slot (allows sizing down subsequent slots vs S1). */
+  slot2AllocPct: number;
 }
 
 export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
@@ -81,6 +83,7 @@ export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
   cashYieldPct: 3,
   numSlots: 1,
   slotDipIncrement: 0.02,
+  slot2AllocPct: 50,
 };
 
 /**
@@ -103,6 +106,7 @@ export const RANGE_MODE_CONFIG: Omit<BacktestConfig, 'portfolioSize'> = {
   cashYieldPct: 3,
   numSlots: 1,
   slotDipIncrement: 0.02,
+  slot2AllocPct: 50,
 };
 
 export type TradeSide = 'buy' | 'sell';
