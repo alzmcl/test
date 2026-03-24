@@ -264,8 +264,6 @@ export default function BTCSwingAnalyzer() {
               config={config}
               onConfigApply={(c) => {
                 setConfig(c);
-                setFromDate(new Date(Date.now() - 730 * 86_400_000).toISOString().slice(0, 10));
-                setToDate(new Date().toISOString().slice(0, 10));
                 setActiveTab('chart');
               }}
             />
