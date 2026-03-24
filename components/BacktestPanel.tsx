@@ -56,6 +56,9 @@ export default function BacktestPanel({ result, config, onConfigChange }: Props)
 
   return (
     <div className="px-8 pt-7">
+      <div style={{ background: 'red', color: 'white', padding: 8, marginBottom: 8, fontFamily: 'monospace', fontSize: 12 }}>
+        *** DEBUG: BacktestPanel v2 rendering ***
+      </div>
       <div
         className="rounded-xl overflow-hidden"
         style={{ background: '#0c1626', border: '1px solid #1e293b' }}
