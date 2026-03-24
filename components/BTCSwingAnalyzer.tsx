@@ -17,6 +17,12 @@ import Optimizer from './Optimizer';
 const THRESHOLD = 0.05;
 type Tab = 'chart' | 'trades' | 'equity' | 'optimizer';
 
+const ASSETS = [
+  { id: 'BTC', label: 'BTC / USD', color: '#f59e0b', title: 'Bitcoin Swing' },
+  { id: 'ETH', label: 'ETH / USD', color: '#818cf8', title: 'Ethereum Swing' },
+  { id: 'QQQ', label: 'QQQ / USD', color: '#4ade80', title: 'Nasdaq (QQQ) Swing' },
+];
+
 const TABS: { id: Tab; label: string }[] = [
   { id: 'chart',     label: 'Chart' },
   { id: 'trades',    label: 'Trades' },
@@ -33,13 +39,16 @@ export default function BTCSwingAnalyzer() {
   const [fromDate, setFromDate] = useState(() => new Date(Date.now() - 730 * 86_400_000).toISOString().slice(0, 10));
   const [toDate, setToDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [activeTab, setActiveTab] = useState<Tab>('chart');
+  const [assetId, setAssetId] = useState('BTC');
+
+  const asset = ASSETS.find((a) => a.id === assetId) ?? ASSETS[0];
 
   // ── Fetch prices from our Next.js API route
   useEffect(() => {
     setLoading(true);
     setError(null);
 
-    fetch(`/api/prices?from=${fromDate}&to=${toDate}`)
+    fetch(`/api/prices?symbol=${assetId}&from=${fromDate}&to=${toDate}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json() as Promise<{ prices: PriceDay[]; error?: string }>;
@@ -53,7 +62,7 @@ export default function BTCSwingAnalyzer() {
         setError(e.message);
         setLoading(false);
       });
-  }, [fromDate, toDate]);
+  }, [assetId, fromDate, toDate]);
 
   const filteredPrices = prices;
 
@@ -121,13 +130,31 @@ export default function BTCSwingAnalyzer() {
         <div className="flex items-baseline gap-3 mb-2 flex-wrap">
           <span
             className="text-xs font-mono uppercase tracking-widest"
-            style={{ color: '#f59e0b' }}
+            style={{ color: asset.color }}
           >
-            BTC / USD
+            {asset.label}
           </span>
           <span className="text-xs font-mono" style={{ color: '#334155' }}>
             regime-filtered swing backtester
           </span>
+
+          {/* Asset picker */}
+          <div className="flex gap-1 ml-4">
+            {ASSETS.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => setAssetId(a.id)}
+                className="text-xs font-mono px-2.5 py-1 rounded"
+                style={{
+                  background: assetId === a.id ? a.color + '22' : 'transparent',
+                  color: assetId === a.id ? a.color : '#475569',
+                  border: assetId === a.id ? `1px solid ${a.color}44` : '1px solid transparent',
+                }}
+              >
+                {a.id}
+              </button>
+            ))}
+          </div>
 
           {/* Date range controls */}
           <div className="ml-auto flex items-center gap-2">
@@ -156,8 +183,8 @@ export default function BTCSwingAnalyzer() {
           className="text-3xl font-bold"
           style={{ letterSpacing: '-0.03em', lineHeight: 1.1, color: '#f1f5f9' }}
         >
-          Bitcoin Swing<br />
-          <span style={{ color: '#38bdf8' }}>Strategy Scanner</span>
+          {asset.title}<br />
+          <span style={{ color: asset.color }}>Strategy Scanner</span>
         </h1>
       </header>
 
@@ -167,7 +194,7 @@ export default function BTCSwingAnalyzer() {
             className="w-2 h-2 rounded-full animate-pulse-dot"
             style={{ background: '#38bdf8' }}
           />
-          Fetching BTC data…
+          Fetching {asset.id} data…
         </div>
       )}
 

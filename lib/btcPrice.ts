@@ -2,21 +2,30 @@ import type { PriceDay } from '@/types';
 
 const EODHD_BASE = 'https://eodhd.com/api/eod';
 
+// Map from our asset id to EODHD ticker symbol
+const EODHD_TICKER: Record<string, string> = {
+  BTC: 'BTC-USD.CC',
+  ETH: 'ETH-USD.CC',
+  QQQ: 'QQQ.US',
+};
+
 /**
- * Fetch daily BTC/USD closing prices via EODHD's end-of-day API.
+ * Fetch daily closing prices for the given asset via EODHD's end-of-day API.
  * Returns data sorted oldest-first.
  *
+ * @param symbol    Asset id: 'BTC' | 'ETH' | 'QQQ'
  * @param fromDate  ISO date string 'YYYY-MM-DD' (inclusive)
  * @param toDate    ISO date string 'YYYY-MM-DD' (inclusive), defaults to today
  */
-export async function fetchBTCPrices(fromDate: string, toDate?: string): Promise<PriceDay[]> {
+export async function fetchPrices(symbol: string, fromDate: string, toDate?: string): Promise<PriceDay[]> {
   const apiKey = process.env.EODHD_API_KEY;
   if (!apiKey) throw new Error('EODHD_API_KEY is not set');
 
+  const ticker = EODHD_TICKER[symbol] ?? EODHD_TICKER['BTC'];
   const to = toDate ?? new Date().toISOString().split('T')[0];
 
   const url =
-    `${EODHD_BASE}/BTC-USD.CC` +
+    `${EODHD_BASE}/${ticker}` +
     `?api_token=${apiKey}&fmt=json&from=${fromDate}&to=${to}`;
 
   const res = await fetch(url, {
@@ -48,11 +57,16 @@ export async function fetchBTCPrices(fromDate: string, toDate?: string): Promise
     .sort((a, b) => a.date - b.date);
 }
 
+/** @deprecated use fetchPrices('BTC', ...) */
+export async function fetchBTCPrices(fromDate: string, toDate?: string): Promise<PriceDay[]> {
+  return fetchPrices('BTC', fromDate, toDate);
+}
+
 /**
  * Thin wrapper used by the API route.
  */
-export async function getPrices(fromDate: string, toDate?: string): Promise<PriceDay[]> {
-  return fetchBTCPrices(fromDate, toDate);
+export async function getPrices(symbol: string, fromDate: string, toDate?: string): Promise<PriceDay[]> {
+  return fetchPrices(symbol, fromDate, toDate);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────

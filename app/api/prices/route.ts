@@ -17,9 +17,10 @@ export async function GET(req: NextRequest) {
   const today = new Date().toISOString().split('T')[0];
   const from = searchParams.get('from') ?? new Date(Date.now() - 180 * 86_400_000).toISOString().split('T')[0];
   const to = searchParams.get('to') ?? today;
+  const symbol = searchParams.get('symbol') ?? 'BTC';
 
   try {
-    const prices = await getPrices(from, to);
+    const prices = await getPrices(symbol, from, to);
     return NextResponse.json(
       { prices },
       {
