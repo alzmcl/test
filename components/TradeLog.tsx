@@ -64,8 +64,8 @@ export default function TradeLog({ trades, portfolioSize }: Props) {
           ['Trades', closed.length, '#e2e8f0'],
           ['Wins', wins.length, '#4ade80'],
           ['Losses', losses.length, '#f87171'],
-          ['Best', '+' + bestPnl.toFixed(2) + '%', '#4ade80'],
-          ['Worst', worstPnl.toFixed(2) + '%', '#f87171'],
+          ['Best', '+' + (bestPnl * 100).toFixed(2) + '%', '#4ade80'],
+          ['Worst', (worstPnl * 100).toFixed(2) + '%', '#f87171'],
         ].map(([k, v, c]) => (
           <div key={k as string}>
             <p className="text-xs mb-0.5" style={{ color: '#334155' }}>{k}</p>
