@@ -147,12 +147,13 @@ export function runBacktest(
           slot.cooldownBarsLeft = reEntryCooldownBars;
         }
       } else if (slot.cooldownBarsLeft === 0) {
-        // Each successive slot requires a larger dip
+        // Each successive slot requires a larger dip AND the previous slot must already be in position
+        const prevSlotIn = s === 0 || slots[s - 1].inPosition;
         const slotDipThreshold = entryDipPct + s * slotDipIncrement;
         const dipTriggered = price <= windowHigh * (1 - slotDipThreshold);
         const reEntryOk = slot.lastExitPrice === 0 || price <= slot.lastExitPrice * (1 - reEntryDipPct);
 
-        if (regimeOk && dipTriggered && reEntryOk) {
+        if (regimeOk && dipTriggered && reEntryOk && prevSlotIn) {
           const totalEquity = cashValue + slots.reduce((sum, sl) => sum + sl.btcValue, 0);
           const deployAmount = totalEquity * allocationPerSlot;
 
