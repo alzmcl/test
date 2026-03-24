@@ -30,8 +30,8 @@ export default function BTCSwingAnalyzer() {
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<BacktestConfig>(DEFAULT_BACKTEST_CONFIG);
   const [result, setResult] = useState<BacktestResult | null>(null);
-  const [days, setDays] = useState(180);
-  const [startDate, setStartDate] = useState<string>('');
+  const [fromDate, setFromDate] = useState(() => new Date(Date.now() - 730 * 86_400_000).toISOString().slice(0, 10));
+  const [toDate, setToDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [activeTab, setActiveTab] = useState<Tab>('chart');
 
   // ── Fetch prices from our Next.js API route
@@ -39,7 +39,7 @@ export default function BTCSwingAnalyzer() {
     setLoading(true);
     setError(null);
 
-    fetch(`/api/prices?days=${days}`)
+    fetch(`/api/prices?from=${fromDate}&to=${toDate}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json() as Promise<{ prices: PriceDay[]; error?: string }>;
@@ -53,12 +53,9 @@ export default function BTCSwingAnalyzer() {
         setError(e.message);
         setLoading(false);
       });
-  }, [days]);
+  }, [fromDate, toDate]);
 
-  // ── Filter prices by optional start date
-  const filteredPrices = startDate
-    ? prices.filter((p) => p.date >= new Date(startDate).getTime())
-    : prices;
+  const filteredPrices = prices;
 
   // ── Run backtester whenever prices or config change
   useEffect(() => {
@@ -137,38 +134,22 @@ export default function BTCSwingAnalyzer() {
             <span className="text-xs font-mono" style={{ color: '#334155' }}>from</span>
             <input
               type="date"
-              value={startDate}
-              max={new Date().toISOString().slice(0, 10)}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                // ensure we fetch enough history
-                if (e.target.value) {
-                  const daysNeeded = Math.ceil((Date.now() - new Date(e.target.value).getTime()) / 86400000) + 10;
-                  setDays(Math.min(730, Math.max(days, daysNeeded)));
-                }
-              }}
+              value={fromDate}
+              max={toDate}
+              onChange={(e) => { if (e.target.value) setFromDate(e.target.value); }}
               className="text-xs font-mono px-2 py-1 rounded"
               style={{ background: '#0c1626', border: '1px solid #1e293b', color: '#94a3b8', colorScheme: 'dark' }}
             />
-            {startDate && (
-              <button
-                onClick={() => setStartDate('')}
-                className="text-xs font-mono px-1.5 py-1 rounded"
-                style={{ background: '#1e293b', color: '#64748b', border: '1px solid #1e293b' }}
-              >
-                ✕
-              </button>
-            )}
-            <select
-              value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
+            <span className="text-xs font-mono" style={{ color: '#334155' }}>to</span>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => { if (e.target.value) setToDate(e.target.value); }}
               className="text-xs font-mono px-2 py-1 rounded"
-              style={{ background: '#0c1626', border: '1px solid #1e293b', color: '#94a3b8' }}
-            >
-              {[90, 180, 270, 365, 730].map((d) => (
-                <option key={d} value={d}>{d}d</option>
-              ))}
-            </select>
+              style={{ background: '#0c1626', border: '1px solid #1e293b', color: '#94a3b8', colorScheme: 'dark' }}
+            />
           </div>
         </div>
         <h1
@@ -186,7 +167,7 @@ export default function BTCSwingAnalyzer() {
             className="w-2 h-2 rounded-full animate-pulse-dot"
             style={{ background: '#38bdf8' }}
           />
-          Fetching {days} days of BTC data…
+          Fetching BTC data…
         </div>
       )}
 
@@ -283,7 +264,8 @@ export default function BTCSwingAnalyzer() {
               config={config}
               onConfigApply={(c) => {
                 setConfig(c);
-                setDays(730);
+                setFromDate(new Date(Date.now() - 730 * 86_400_000).toISOString().slice(0, 10));
+                setToDate(new Date().toISOString().slice(0, 10));
                 setActiveTab('chart');
               }}
             />

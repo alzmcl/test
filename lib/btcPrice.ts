@@ -6,20 +6,18 @@ const EODHD_BASE = 'https://eodhd.com/api/eod';
  * Fetch daily BTC/USD closing prices via EODHD's end-of-day API.
  * Returns data sorted oldest-first.
  *
- * @param days  How many days back to fetch (default 180 = ~6 months)
+ * @param fromDate  ISO date string 'YYYY-MM-DD' (inclusive)
+ * @param toDate    ISO date string 'YYYY-MM-DD' (inclusive), defaults to today
  */
-export async function fetchBTCPrices(days = 180): Promise<PriceDay[]> {
+export async function fetchBTCPrices(fromDate: string, toDate?: string): Promise<PriceDay[]> {
   const apiKey = process.env.EODHD_API_KEY;
   if (!apiKey) throw new Error('EODHD_API_KEY is not set');
 
-  const to = new Date();
-  const from = new Date(Date.now() - days * 86_400_000);
-
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const to = toDate ?? new Date().toISOString().split('T')[0];
 
   const url =
     `${EODHD_BASE}/BTC-USD.CC` +
-    `?api_token=${apiKey}&fmt=json&from=${fmt(from)}&to=${fmt(to)}`;
+    `?api_token=${apiKey}&fmt=json&from=${fromDate}&to=${to}`;
 
   const res = await fetch(url, {
     // Next.js 14 fetch cache: revalidate at most once per hour
@@ -53,8 +51,8 @@ export async function fetchBTCPrices(days = 180): Promise<PriceDay[]> {
 /**
  * Thin wrapper used by the API route.
  */
-export async function getPrices(days = 180): Promise<PriceDay[]> {
-  return fetchBTCPrices(days);
+export async function getPrices(fromDate: string, toDate?: string): Promise<PriceDay[]> {
+  return fetchBTCPrices(fromDate, toDate);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────

@@ -14,13 +14,12 @@ export const runtime = 'edge';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const days = Math.min(
-    Math.max(parseInt(searchParams.get('days') ?? '180', 10), 30),
-    730
-  );
+  const today = new Date().toISOString().split('T')[0];
+  const from = searchParams.get('from') ?? new Date(Date.now() - 180 * 86_400_000).toISOString().split('T')[0];
+  const to = searchParams.get('to') ?? today;
 
   try {
-    const prices = await getPrices(days);
+    const prices = await getPrices(from, to);
     return NextResponse.json(
       { prices },
       {
