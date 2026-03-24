@@ -95,7 +95,7 @@ export default function TradeLog({ trades, portfolioSize }: Props) {
           <div
             className="grid text-xs font-mono px-4 py-2"
             style={{
-              gridTemplateColumns: '1fr 1fr 0.6fr 0.4fr 1fr 1fr 1fr 1fr 1fr 1fr',
+              gridTemplateColumns: '1fr 1fr 0.6fr 0.4fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr',
               background: '#080e1a',
               color: '#334155',
             }}
@@ -104,6 +104,7 @@ export default function TradeLog({ trades, portfolioSize }: Props) {
             <span>Exit</span>
             <span>Days</span>
             <span>Slot</span>
+            <span>Amount</span>
             <span>Entry $</span>
             <span>Exit $</span>
             <span>Reason</span>
@@ -126,7 +127,7 @@ export default function TradeLog({ trades, portfolioSize }: Props) {
                   key={i}
                   className="grid text-xs font-mono px-4 py-2.5 items-center"
                   style={{
-                    gridTemplateColumns: '1fr 1fr 0.6fr 0.4fr 1fr 1fr 1fr 1fr 1fr 1fr',
+                    gridTemplateColumns: '1fr 1fr 0.6fr 0.4fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr',
                     background: i % 2 === 0 ? '#0c1626' : '#080e1a',
                     borderBottom: '1px solid #0f172a',
                   }}
@@ -137,6 +138,7 @@ export default function TradeLog({ trades, portfolioSize }: Props) {
                   </span>
                   <span style={{ color: '#475569' }}>{durationDays}d</span>
                   <span style={{ color: '#475569' }}>S{(t.slot ?? 0) + 1}</span>
+                  <span style={{ color: '#64748b' }}>{formatPrice(Math.round((t.entryValue ?? 0) * portfolioSize))}</span>
                   <span style={{ color: '#94a3b8' }}>{formatPrice(t.entryPrice)}</span>
                   <span style={{ color: '#94a3b8' }}>
                     {t.exitPrice ? formatPrice(t.exitPrice) : '—'}

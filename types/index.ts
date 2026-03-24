@@ -117,6 +117,7 @@ export interface Trade {
   pnlPct: number | null;          // after fees
   regime: Regime;
   slot: number;                   // 0-indexed slot that generated this trade
+  entryValue: number;             // normalised fraction of initial portfolio deployed (multiply by portfolioSize for $)
 }
 
 export interface EquityPoint {

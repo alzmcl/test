@@ -167,6 +167,7 @@ export function runBacktest(
               entryPrice: price,
               regime: day.regime,
               slot: s,
+              entryValue: deployAmount,
             };
           }
         }
