@@ -33,9 +33,10 @@ interface OptResult {
   maxDrawdownPct: number;
   sharpeProxy: number;
   profitFactor: number;
+  timeInMarketPct: number;
 }
 
-type SortKey = 'totalReturnPct' | 'sharpeProxy' | 'winRate' | 'maxDrawdownPct' | 'profitFactor';
+type SortKey = 'totalReturnPct' | 'sharpeProxy' | 'winRate' | 'maxDrawdownPct' | 'profitFactor' | 'timeInMarketPct';
 type ViewKey = 'table' | 'heatmap' | 'sensitivity';
 
 type ParamKey =
@@ -244,6 +245,7 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                     maxDrawdownPct: s.maxDrawdownPct,
                     sharpeProxy: s.sharpeProxy,
                     profitFactor: s.profitFactor,
+                    timeInMarketPct: s.timeInMarketPct,
                   });
                 }
               }
@@ -257,10 +259,10 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
     }, 10);
   }
 
-  // Best by Sharpe among combos with enough trades for meaningful stats
+  // Best by Sharpe among combos with enough trades AND meaningful market activity
   const recommended = results.length
     ? results
-        .filter((r) => r.trades >= minTrades)
+        .filter((r) => r.trades >= minTrades && r.timeInMarketPct >= 10)
         .reduce<OptResult | null>((best, r) => (!best || r.sharpeProxy > best.sharpeProxy ? r : best), null)
     : null;
 
@@ -335,6 +337,7 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                       ['Lookback', recommended.lookbackDays + 'd'],
                       ['H.Stop', recommended.hardStopPct === 0 ? 'off' : (recommended.hardStopPct * 100).toFixed(0) + '%'],
                       ['Trades', String(recommended.trades)],
+                      ['Cash%', (100 - recommended.timeInMarketPct).toFixed(0) + '%'],
                       ['P.Factor', recommended.profitFactor >= 99 ? '∞' : recommended.profitFactor.toFixed(2)],
                       ['Return', (recommended.totalReturnPct >= 0 ? '+' : '') + recommended.totalReturnPct + '%'],
                       ['Sharpe', recommended.sharpeProxy.toFixed(2)],
@@ -391,6 +394,7 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                 <SortBtn id="profitFactor" active={sort === 'profitFactor'} label="P.Factor" onClick={() => setSort('profitFactor')} />
                 <SortBtn id="winRate" active={sort === 'winRate'} label="Win rate" onClick={() => setSort('winRate')} />
                 <SortBtn id="maxDrawdownPct" active={sort === 'maxDrawdownPct'} label="Min drawdown" onClick={() => setSort('maxDrawdownPct')} />
+                <SortBtn id="timeInMarketPct" active={sort === 'timeInMarketPct'} label="Active%" onClick={() => setSort('timeInMarketPct')} />
                 <div className="ml-auto flex items-center gap-2">
                   <span className="text-xs font-mono" style={{ color: '#334155' }}>Min trades:</span>
                   <input
@@ -409,7 +413,7 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                 <div
                   className="grid text-xs font-mono px-4 py-2"
                   style={{
-                    gridTemplateColumns: '2rem 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 5rem',
+                    gridTemplateColumns: '2rem 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 5rem',
                     background: '#080e1a',
                     color: '#334155',
                   }}
@@ -420,6 +424,7 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                   <span>H.Stop</span>
                   <span>Lookback</span>
                   <span>Trades</span>
+                  <span>Cash%</span>
                   <span>P.Factor</span>
                   <span>Win%</span>
                   <span>Return</span>
@@ -447,7 +452,7 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                         key={i}
                         className="grid text-xs font-mono px-4 py-2.5 items-center"
                         style={{
-                          gridTemplateColumns: '2rem 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 5rem',
+                          gridTemplateColumns: '2rem 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 5rem',
                           background: isActive ? '#0f1f33' : i % 2 === 0 ? '#0c1626' : '#080e1a',
                           borderBottom: '1px solid #0f172a',
                           borderLeft: isRec ? '2px solid #38bdf8' : isActive ? '2px solid #f59e0b' : '2px solid transparent',
@@ -459,6 +464,9 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                         <span style={{ color: '#94a3b8' }}>{r.hardStopPct === 0 ? 'off' : (r.hardStopPct * 100).toFixed(0) + '%'}</span>
                         <span style={{ color: '#94a3b8' }}>{r.lookbackDays}d</span>
                         <span style={{ color: '#e2e8f0' }}>{r.trades}</span>
+                        <span style={{ color: r.timeInMarketPct < 15 ? '#f59e0b' : '#94a3b8' }}>
+                          {(100 - r.timeInMarketPct).toFixed(0)}%
+                        </span>
                         <span style={{ color: pfColor, fontWeight: 600 }}>
                           {r.profitFactor >= 99 ? '∞' : r.profitFactor.toFixed(2)}
                         </span>
@@ -494,7 +502,7 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                 Top 30 of {results.filter((r) => r.trades >= minTrades).length} combinations with ≥{minTrades} trades
                 ({results.filter((r) => r.trades > 0).length} total valid).
                 Blue border = recommended. Amber border = current config.
-                P.Factor: green ≥2, amber ≥1, red &lt;1.
+                P.Factor: green ≥2, amber ≥1, red &lt;1. Cash%: amber = &gt;85% idle.
               </p>
             </>
           )}
