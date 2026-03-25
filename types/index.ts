@@ -144,6 +144,7 @@ export interface BacktestStats {
   totalReturnPct: number;
   maxDrawdownPct: number;
   sharpeProxy: number;      // annualised Sharpe approximation
+  profitFactor: number;     // gross wins / gross losses (99 if no losses)
   tradesInTrending: number;
   tradesInChoppy: number;
   portfolioFinalValue: number;

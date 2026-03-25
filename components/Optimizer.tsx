@@ -25,23 +25,34 @@ interface OptResult {
   trailingStopPct: number;
   trailingStopActivationPct: number;
   reEntryDipPct: number;
+  lookbackDays: number;
+  hardStopPct: number;
   trades: number;
   winRate: number;
   totalReturnPct: number;
   maxDrawdownPct: number;
   sharpeProxy: number;
+  profitFactor: number;
 }
 
-type SortKey = 'totalReturnPct' | 'sharpeProxy' | 'winRate' | 'maxDrawdownPct';
+type SortKey = 'totalReturnPct' | 'sharpeProxy' | 'winRate' | 'maxDrawdownPct' | 'profitFactor';
 type ViewKey = 'table' | 'heatmap' | 'sensitivity';
 
-type ParamKey = 'entryDipPct' | 'trailingStopPct' | 'trailingStopActivationPct' | 'reEntryDipPct';
+type ParamKey =
+  | 'entryDipPct'
+  | 'trailingStopPct'
+  | 'trailingStopActivationPct'
+  | 'reEntryDipPct'
+  | 'lookbackDays'
+  | 'hardStopPct';
 
 const PARAM_LABELS: Record<ParamKey, string> = {
   entryDipPct: 'Entry dip',
   trailingStopPct: 'Trailing stop',
   trailingStopActivationPct: 'Activation',
   reEntryDipPct: 'Re-entry dip',
+  lookbackDays: 'Lookback days',
+  hardStopPct: 'Hard stop',
 };
 
 const PARAM_COLORS: Record<ParamKey, string> = {
@@ -49,21 +60,35 @@ const PARAM_COLORS: Record<ParamKey, string> = {
   trailingStopPct: '#818cf8',
   trailingStopActivationPct: '#f59e0b',
   reEntryDipPct: '#4ade80',
+  lookbackDays: '#fb923c',
+  hardStopPct: '#f87171',
 };
 
 const ENTRY_DIPS = [0.02, 0.03, 0.04, 0.05, 0.06, 0.08];
 const TRAILING_STOPS = [0.04, 0.05, 0.06, 0.08, 0.10];
 const ACTIVATIONS = [0.03, 0.05, 0.07, 0.10];
 const REENTRY_DIPS = [0.02, 0.03, 0.05, 0.07];
+const LOOKBACK_DAYS_OPTS = [10, 14, 20, 30];
+const HARD_STOP_OPTS = [0, 0.05, 0.08, 0.12];
 
 const PARAM_VALUES: Record<ParamKey, number[]> = {
   entryDipPct: ENTRY_DIPS,
   trailingStopPct: TRAILING_STOPS,
   trailingStopActivationPct: ACTIVATIONS,
   reEntryDipPct: REENTRY_DIPS,
+  lookbackDays: LOOKBACK_DAYS_OPTS,
+  hardStopPct: HARD_STOP_OPTS,
 };
 
-const TOTAL = ENTRY_DIPS.length * TRAILING_STOPS.length * ACTIVATIONS.length * REENTRY_DIPS.length;
+// Approximate upper bound (actual valid count is lower due to activation constraint)
+const TOTAL = ENTRY_DIPS.length * TRAILING_STOPS.length * ACTIVATIONS.length * REENTRY_DIPS.length
+  * LOOKBACK_DAYS_OPTS.length * HARD_STOP_OPTS.length;
+
+function formatParamValue(param: ParamKey, val: number): string {
+  if (param === 'lookbackDays') return val + 'd';
+  if (param === 'hardStopPct') return val === 0 ? 'off' : (val * 100).toFixed(0) + '%';
+  return (val * 100).toFixed(0) + '%';
+}
 
 // ─── Colour scale for heatmap ───────────────────────────────────────────────
 function returnColor(pct: number): string {
@@ -107,7 +132,10 @@ function buildHeatmap(
 function buildSensitivity(
   results: OptResult[]
 ): Record<ParamKey, { label: string; avg: number }[]> {
-  const params: ParamKey[] = ['entryDipPct', 'trailingStopPct', 'trailingStopActivationPct', 'reEntryDipPct'];
+  const params: ParamKey[] = [
+    'entryDipPct', 'trailingStopPct', 'trailingStopActivationPct', 'reEntryDipPct',
+    'lookbackDays', 'hardStopPct',
+  ];
   const out = {} as Record<ParamKey, { label: string; avg: number }[]>;
 
   for (const p of params) {
@@ -117,7 +145,7 @@ function buildSensitivity(
         ? group.reduce((a, r) => a + r.totalReturnPct, 0) / group.length
         : 0;
       return {
-        label: (val * 100).toFixed(0) + '%',
+        label: formatParamValue(p, val),
         avg: Math.round(avg * 100) / 100,
       };
     });
@@ -173,54 +201,52 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
   const [heatX, setHeatX] = useState<ParamKey>('entryDipPct');
   const [heatY, setHeatY] = useState<ParamKey>('trailingStopPct');
   const [hoveredCell, setHoveredCell] = useState<{ x: number; y: number; val: number } | null>(null);
+  const [minTrades, setMinTrades] = useState(6);
 
-  async function runOptimizer() {
+  function runOptimizer() {
     setRunning(true);
     setResults([]);
-
-    // Always use 730 days for optimizer so there are enough trades per combination
-    let optPrices = prices;
-    try {
-      const res = await fetch('/api/prices?days=730');
-      if (res.ok) {
-        const data = await res.json() as { prices: PriceDay[] };
-        if (data.prices?.length > prices.length) optPrices = data.prices;
-      }
-    } catch {
-      // fall back to current prices
-    }
 
     setTimeout(() => {
       const found: OptResult[] = [];
 
-      for (const entryDipPct of ENTRY_DIPS) {
-        for (const trailingStopPct of TRAILING_STOPS) {
-          for (const trailingStopActivationPct of ACTIVATIONS) {
-            for (const reEntryDipPct of REENTRY_DIPS) {
-              if (trailingStopActivationPct > trailingStopPct + 0.02) continue;
+      for (const lookbackDays of LOOKBACK_DAYS_OPTS) {
+        for (const hardStopPct of HARD_STOP_OPTS) {
+          for (const entryDipPct of ENTRY_DIPS) {
+            for (const trailingStopPct of TRAILING_STOPS) {
+              for (const trailingStopActivationPct of ACTIVATIONS) {
+                for (const reEntryDipPct of REENTRY_DIPS) {
+                  if (trailingStopActivationPct > trailingStopPct + 0.02) continue;
 
-              const testConfig: BacktestConfig = {
-                ...config,
-                entryDipPct,
-                trailingStopPct,
-                trailingStopActivationPct,
-                reEntryDipPct,
-              };
+                  const testConfig: BacktestConfig = {
+                    ...config,
+                    lookbackDays,
+                    hardStopPct,
+                    entryDipPct,
+                    trailingStopPct,
+                    trailingStopActivationPct,
+                    reEntryDipPct,
+                  };
 
-              const res = runBacktest(optPrices, testConfig);
-              const s = res.stats;
+                  const res = runBacktest(prices, testConfig);
+                  const s = res.stats;
 
-              found.push({
-                entryDipPct,
-                trailingStopPct,
-                trailingStopActivationPct,
-                reEntryDipPct,
-                trades: s.totalTrades,
-                winRate: s.winRate,
-                totalReturnPct: s.totalReturnPct,
-                maxDrawdownPct: s.maxDrawdownPct,
-                sharpeProxy: s.sharpeProxy,
-              });
+                  found.push({
+                    lookbackDays,
+                    hardStopPct,
+                    entryDipPct,
+                    trailingStopPct,
+                    trailingStopActivationPct,
+                    reEntryDipPct,
+                    trades: s.totalTrades,
+                    winRate: s.winRate,
+                    totalReturnPct: s.totalReturnPct,
+                    maxDrawdownPct: s.maxDrawdownPct,
+                    sharpeProxy: s.sharpeProxy,
+                    profitFactor: s.profitFactor,
+                  });
+                }
+              }
             }
           }
         }
@@ -231,16 +257,17 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
     }, 10);
   }
 
-  // Best by Sharpe with >= 2 trades
+  // Best by Sharpe among combos with enough trades for meaningful stats
   const recommended = results.length
     ? results
-        .filter((r) => r.trades >= 2)
-        .reduce((best, r) => (r.sharpeProxy > best.sharpeProxy ? r : best), results[0])
+        .filter((r) => r.trades >= minTrades)
+        .reduce<OptResult | null>((best, r) => (!best || r.sharpeProxy > best.sharpeProxy ? r : best), null)
     : null;
 
   const sorted = [...results]
+    .filter((r) => r.trades >= minTrades)
     .sort((a, b) => sort === 'maxDrawdownPct' ? a[sort] - b[sort] : b[sort] - a[sort])
-    .slice(0, 25);
+    .slice(0, 30);
 
   const heatmap = results.length ? buildHeatmap(results, heatX, heatY) : null;
   const sensitivity = results.length ? buildSensitivity(results) : null;
@@ -268,8 +295,8 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
         <div>
           <p className="text-sm font-semibold mb-0.5" style={{ color: '#94a3b8' }}>Parameter Optimizer</p>
           <p className="text-xs font-mono" style={{ color: '#475569' }}>
-            Grid search across {TOTAL} combinations — entry dip, trailing stop, activation, re-entry dip.
-            Uses up to 730 days of data regardless of chart view period.
+            Grid search across ~{TOTAL.toLocaleString()} combinations — entry dip, trailing stop, activation,
+            re-entry dip, lookback window, hard stop. Runs on the current date range.
           </p>
         </div>
         <button
@@ -296,7 +323,7 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
             >
               <div>
                 <p className="text-xs font-mono mb-1" style={{ color: '#38bdf8' }}>
-                  ★ RECOMMENDED (best Sharpe)
+                  ★ RECOMMENDED (best Sharpe, ≥{minTrades} trades)
                 </p>
                 <div className="flex flex-wrap gap-4" style={{ fontFamily: 'DM Mono,monospace' }}>
                   {(
@@ -305,6 +332,10 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                       ['Stop', (recommended.trailingStopPct * 100).toFixed(0) + '%'],
                       ['Activ.', (recommended.trailingStopActivationPct * 100).toFixed(0) + '%'],
                       ['Re-entry', (recommended.reEntryDipPct * 100).toFixed(0) + '%'],
+                      ['Lookback', recommended.lookbackDays + 'd'],
+                      ['H.Stop', recommended.hardStopPct === 0 ? 'off' : (recommended.hardStopPct * 100).toFixed(0) + '%'],
+                      ['Trades', String(recommended.trades)],
+                      ['P.Factor', recommended.profitFactor >= 99 ? '∞' : recommended.profitFactor.toFixed(2)],
                       ['Return', (recommended.totalReturnPct >= 0 ? '+' : '') + recommended.totalReturnPct + '%'],
                       ['Sharpe', recommended.sharpeProxy.toFixed(2)],
                       ['Win%', recommended.winRate + '%'],
@@ -322,6 +353,8 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                 onClick={() =>
                   onConfigApply({
                     ...config,
+                    lookbackDays: recommended.lookbackDays,
+                    hardStopPct: recommended.hardStopPct,
                     entryDipPct: recommended.entryDipPct,
                     trailingStopPct: recommended.trailingStopPct,
                     trailingStopActivationPct: recommended.trailingStopActivationPct,
@@ -335,6 +368,11 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
               </button>
             </div>
           )}
+          {!recommended && results.length > 0 && (
+            <div className="rounded-xl p-4 mb-5 text-xs font-mono" style={{ background: '#0a1929', border: '1px solid #334155', color: '#f59e0b' }}>
+              No combination with ≥{minTrades} trades found. Try lowering the min trades filter.
+            </div>
+          )}
 
           {/* View toggle */}
           <div className="flex gap-1 mb-4">
@@ -346,19 +384,32 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
           {/* ── TABLE VIEW ─────────────────────────────────────────────── */}
           {view === 'table' && (
             <>
-              <div className="flex gap-1 mb-3 flex-wrap">
+              <div className="flex gap-1 mb-3 flex-wrap items-center">
                 <span className="text-xs font-mono self-center mr-1" style={{ color: '#334155' }}>Sort:</span>
                 <SortBtn id="totalReturnPct" active={sort === 'totalReturnPct'} label="Return" onClick={() => setSort('totalReturnPct')} />
                 <SortBtn id="sharpeProxy" active={sort === 'sharpeProxy'} label="Sharpe" onClick={() => setSort('sharpeProxy')} />
+                <SortBtn id="profitFactor" active={sort === 'profitFactor'} label="P.Factor" onClick={() => setSort('profitFactor')} />
                 <SortBtn id="winRate" active={sort === 'winRate'} label="Win rate" onClick={() => setSort('winRate')} />
                 <SortBtn id="maxDrawdownPct" active={sort === 'maxDrawdownPct'} label="Min drawdown" onClick={() => setSort('maxDrawdownPct')} />
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-xs font-mono" style={{ color: '#334155' }}>Min trades:</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={minTrades}
+                    onChange={(e) => setMinTrades(Math.max(1, Number(e.target.value)))}
+                    className="text-xs font-mono px-2 py-1 rounded w-14 text-center"
+                    style={{ background: '#0c1626', border: '1px solid #1e293b', color: '#94a3b8' }}
+                  />
+                </div>
               </div>
 
               <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #1e293b' }}>
                 <div
                   className="grid text-xs font-mono px-4 py-2"
                   style={{
-                    gridTemplateColumns: '2rem 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 5rem',
+                    gridTemplateColumns: '2rem 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 5rem',
                     background: '#080e1a',
                     color: '#334155',
                   }}
@@ -366,9 +417,10 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                   <span>#</span>
                   <span>Entry</span>
                   <span>Stop</span>
-                  <span>Activ.</span>
-                  <span>Re-entry</span>
+                  <span>H.Stop</span>
+                  <span>Lookback</span>
                   <span>Trades</span>
+                  <span>P.Factor</span>
                   <span>Win%</span>
                   <span>Return</span>
                   <span>Drawdown</span>
@@ -380,21 +432,22 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                     const isActive =
                       Math.abs(r.entryDipPct - config.entryDipPct) < 0.001 &&
                       Math.abs(r.trailingStopPct - config.trailingStopPct) < 0.001 &&
-                      Math.abs(r.trailingStopActivationPct - config.trailingStopActivationPct) < 0.001 &&
-                      Math.abs(r.reEntryDipPct - config.reEntryDipPct) < 0.001;
+                      r.lookbackDays === config.lookbackDays &&
+                      Math.abs(r.hardStopPct - config.hardStopPct) < 0.001;
                     const isRec =
                       recommended &&
                       r.entryDipPct === recommended.entryDipPct &&
                       r.trailingStopPct === recommended.trailingStopPct &&
-                      r.trailingStopActivationPct === recommended.trailingStopActivationPct &&
-                      r.reEntryDipPct === recommended.reEntryDipPct;
+                      r.lookbackDays === recommended.lookbackDays &&
+                      r.hardStopPct === recommended.hardStopPct;
+                    const pfColor = r.profitFactor >= 2 ? '#4ade80' : r.profitFactor >= 1 ? '#f59e0b' : '#f87171';
 
                     return (
                       <div
                         key={i}
                         className="grid text-xs font-mono px-4 py-2.5 items-center"
                         style={{
-                          gridTemplateColumns: '2rem 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 5rem',
+                          gridTemplateColumns: '2rem 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 5rem',
                           background: isActive ? '#0f1f33' : i % 2 === 0 ? '#0c1626' : '#080e1a',
                           borderBottom: '1px solid #0f172a',
                           borderLeft: isRec ? '2px solid #38bdf8' : isActive ? '2px solid #f59e0b' : '2px solid transparent',
@@ -403,9 +456,12 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                         <span style={{ color: '#334155' }}>{i + 1}</span>
                         <span style={{ color: '#94a3b8' }}>{(r.entryDipPct * 100).toFixed(0)}%</span>
                         <span style={{ color: '#94a3b8' }}>{(r.trailingStopPct * 100).toFixed(0)}%</span>
-                        <span style={{ color: '#94a3b8' }}>{(r.trailingStopActivationPct * 100).toFixed(0)}%</span>
-                        <span style={{ color: '#94a3b8' }}>{(r.reEntryDipPct * 100).toFixed(0)}%</span>
+                        <span style={{ color: '#94a3b8' }}>{r.hardStopPct === 0 ? 'off' : (r.hardStopPct * 100).toFixed(0) + '%'}</span>
+                        <span style={{ color: '#94a3b8' }}>{r.lookbackDays}d</span>
                         <span style={{ color: '#e2e8f0' }}>{r.trades}</span>
+                        <span style={{ color: pfColor, fontWeight: 600 }}>
+                          {r.profitFactor >= 99 ? '∞' : r.profitFactor.toFixed(2)}
+                        </span>
                         <span style={{ color: '#e2e8f0' }}>{r.winRate}%</span>
                         <span style={{ color: r.totalReturnPct >= 0 ? '#4ade80' : '#f87171', fontWeight: 600 }}>
                           {(r.totalReturnPct >= 0 ? '+' : '') + r.totalReturnPct + '%'}
@@ -415,6 +471,8 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
                           onClick={() =>
                             onConfigApply({
                               ...config,
+                              lookbackDays: r.lookbackDays,
+                              hardStopPct: r.hardStopPct,
                               entryDipPct: r.entryDipPct,
                               trailingStopPct: r.trailingStopPct,
                               trailingStopActivationPct: r.trailingStopActivationPct,
@@ -433,8 +491,10 @@ export default function Optimizer({ prices, config, onConfigApply }: Props) {
               </div>
 
               <p className="text-xs font-mono mt-3" style={{ color: '#334155' }}>
-                Top 25 of {results.filter((r) => r.trades > 0).length} valid combinations.
+                Top 30 of {results.filter((r) => r.trades >= minTrades).length} combinations with ≥{minTrades} trades
+                ({results.filter((r) => r.trades > 0).length} total valid).
                 Blue border = recommended. Amber border = current config.
+                P.Factor: green ≥2, amber ≥1, red &lt;1.
               </p>
             </>
           )}

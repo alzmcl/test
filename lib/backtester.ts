@@ -257,6 +257,12 @@ function computeStats(
   );
   const sharpeProxy = stdReturn === 0 ? 0 : (meanReturn / stdReturn) * Math.sqrt(365);
 
+  const grossWins = wins.reduce((a, t) => a + (t.pnlPct ?? 0), 0);
+  const grossLosses = Math.abs(losses.reduce((a, t) => a + (t.pnlPct ?? 0), 0));
+  const profitFactor = grossLosses === 0
+    ? (grossWins > 0 ? 99 : 1)
+    : Math.round((grossWins / grossLosses) * 100) / 100;
+
   const tradesInTrending = trades.filter((t) => t.regime === 'trending').length;
   const tradesInChoppy = trades.filter((t) => t.regime === 'choppy').length;
   const portfolioFinalValue = Math.round(portfolioSize * (1 + totalReturnPct));
@@ -270,6 +276,7 @@ function computeStats(
     totalReturnPct: Math.round(totalReturnPct * 10000) / 100,
     maxDrawdownPct: Math.round(maxDrawdown * 10000) / 100,
     sharpeProxy: Math.round(sharpeProxy * 100) / 100,
+    profitFactor,
     tradesInTrending,
     tradesInChoppy,
     portfolioFinalValue,
