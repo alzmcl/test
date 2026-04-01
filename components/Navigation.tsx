@@ -11,9 +11,10 @@ interface NavigationProps {
 }
 
 const NAV_LINKS = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/modeller', label: 'Modeller' },
-  { href: '/budget', label: 'Budget' },
+  { href: '/dashboard',   label: 'Dashboard' },
+  { href: '/modeller',    label: 'Modeller' },
+  { href: '/budget',      label: 'Budget' },
+  { href: '/investments', label: 'Investments' },
 ]
 
 export default function Navigation({ user, profile }: NavigationProps) {

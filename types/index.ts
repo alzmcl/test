@@ -1,3 +1,101 @@
+// ─── Portfolio ────────────────────────────────────────────────────────────────
+
+export type AssetType = 'crypto' | 'stock' | 'etf' | 'cash' | 'bond' | 'property' | 'other'
+export type TransactionType = 'buy' | 'sell' | 'dividend' | 'transfer_in' | 'transfer_out' | 'adjustment'
+export type HoldingMember = 'husband' | 'wife' | 'joint'
+
+export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
+  crypto: 'Crypto',
+  stock: 'Stock',
+  etf: 'ETF',
+  cash: 'Cash',
+  bond: 'Bond',
+  property: 'Property',
+  other: 'Other',
+}
+
+export interface PortfolioHolding {
+  id: string
+  symbol: string
+  name: string
+  asset_type: AssetType
+  units: number
+  avg_buy_price_aud: number
+  price_currency: string      // native EODHD price currency ('AUD', 'USD', etc.)
+  is_in_smsf: boolean
+  member: HoldingMember | null
+  notes: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  updated_by: string | null
+}
+
+export interface PortfolioTransaction {
+  id: string
+  holding_id: string
+  symbol: string
+  transaction_type: TransactionType
+  units: number
+  price_per_unit_aud: number
+  fees_aud: number
+  total_aud: number
+  transaction_date: string
+  notes: string | null
+  created_at: string
+  updated_by: string | null
+}
+
+/** Holding enriched with live price data */
+export interface HoldingWithPrice extends PortfolioHolding {
+  current_price_aud: number | null
+  market_value_aud: number | null
+  cost_basis_aud: number
+  unrealised_pnl_aud: number | null
+  unrealised_pnl_pct: number | null
+  price_change_24h_pct: number | null
+}
+
+/** Raw quote from EODHD real-time endpoint */
+export interface EodhdQuote {
+  code: string
+  timestamp: number
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+  previousClose: number
+  change: number
+  change_p: number  // percentage change
+}
+
+// ─── What-If Modeller ─────────────────────────────────────────────────────────
+
+export interface WhatIfScenario {
+  id: string            // client-side uuid for list key
+  label: string
+  initial_value_aud: number
+  monthly_addition_aud: number
+  annual_return_pct: number
+  years: number
+  color: string         // chart line colour
+}
+
+export interface WhatIfYearPoint {
+  year: number
+  value: number
+  invested: number
+}
+
+export interface WhatIfResult extends WhatIfScenario {
+  final_value_aud: number
+  total_invested_aud: number
+  total_growth_aud: number
+  total_growth_pct: number
+  yearly: WhatIfYearPoint[]
+}
+
 // ─── User & Profile ──────────────────────────────────────────────────────────
 
 export type UserRole = 'husband' | 'wife'
