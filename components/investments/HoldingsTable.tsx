@@ -112,8 +112,8 @@ export default function HoldingsTable({ holdings, loading, onHoldingsChange }: P
                       <div>
                         <div>{formatCurrency(h.current_price_aud)}</div>
                         {h.price_change_24h_pct !== null && (
-                          <div className={`text-xs ${h.price_change_24h_pct >= 0 ? 'text-positive' : 'text-negative'}`}>
-                            {h.price_change_24h_pct >= 0 ? '+' : ''}{h.price_change_24h_pct.toFixed(2)}%
+                          <div className={`text-xs ${Number(h.price_change_24h_pct) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                            {Number(h.price_change_24h_pct) >= 0 ? '+' : ''}{Number(h.price_change_24h_pct).toFixed(2)}%
                           </div>
                         )}
                       </div>
@@ -141,7 +141,7 @@ export default function HoldingsTable({ holdings, loading, onHoldingsChange }: P
                     {loading || h.unrealised_pnl_pct === null ? (
                       <div className="h-4 w-14 bg-bg-raised rounded animate-pulse" />
                     ) : (
-                      `${pnlPos ? '+' : ''}${h.unrealised_pnl_pct.toFixed(2)}%`
+                      `${pnlPos ? '+' : ''}${Number(h.unrealised_pnl_pct).toFixed(2)}%`
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -206,7 +206,7 @@ export default function HoldingsTable({ holdings, loading, onHoldingsChange }: P
                 {h.unrealised_pnl_aud !== null && (
                   <Cell
                     label="P&L"
-                    value={`${pnlPos ? '+' : ''}${formatCurrency(h.unrealised_pnl_aud, true)} (${pnlPos ? '+' : ''}${h.unrealised_pnl_pct?.toFixed(2)}%)`}
+                    value={`${pnlPos ? '+' : ''}${formatCurrency(h.unrealised_pnl_aud, true)} (${pnlPos ? '+' : ''}${Number(h.unrealised_pnl_pct).toFixed(2)}%)`}
                     positive={pnlPos}
                     negative={!pnlPos}
                   />
