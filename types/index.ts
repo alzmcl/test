@@ -26,6 +26,8 @@ export interface PortfolioHolding {
   member: HoldingMember | null
   notes: string | null
   is_active: boolean
+  purchase_date: string | null   // stock only
+  brokerage_aud: number | null   // stock only
   created_at: string
   updated_at: string
   updated_by: string | null

@@ -24,6 +24,8 @@ const BLANK: Omit<PortfolioHolding, 'id' | 'created_at' | 'updated_at' | 'update
   member: null,
   notes: null,
   is_active: true,
+  purchase_date: null,
+  brokerage_aud: null,
 }
 
 export default function HoldingForm({ holding, onSave, onClose }: Props) {
@@ -95,6 +97,8 @@ export default function HoldingForm({ holding, onSave, onClose }: Props) {
       member: form.member || null,
       notes: form.notes?.trim() || null,
       is_active: true,
+      purchase_date: form.asset_type === 'stock' ? (form.purchase_date || null) : null,
+      brokerage_aud: form.asset_type === 'stock' ? (form.brokerage_aud ?? null) : null,
       updated_by: user.user?.id ?? null,
     }
 
@@ -348,6 +352,40 @@ export default function HoldingForm({ holding, onSave, onClose }: Props) {
                   )}
                 </div>
               </div>
+
+              {/* Purchase date + brokerage — stocks only */}
+              {form.asset_type === 'stock' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="label">Purchase Date</label>
+                    <input
+                      type="date"
+                      className="input-field w-full"
+                      value={form.purchase_date ?? ''}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, purchase_date: e.target.value || null }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="label">Brokerage (AUD)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      className="input-field w-full"
+                      placeholder="0.00"
+                      value={form.brokerage_aud ?? ''}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          brokerage_aud: e.target.value ? parseFloat(e.target.value) : null,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              )}
             </>
           )}
 
