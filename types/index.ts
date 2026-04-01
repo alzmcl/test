@@ -1,11 +1,13 @@
 // ─── Portfolio ────────────────────────────────────────────────────────────────
 
-export type AssetType = 'crypto' | 'stock' | 'etf' | 'cash' | 'bond' | 'property' | 'other'
+export type AssetType = 'crypto' | 'stock_au' | 'stock_us' | 'stock' | 'etf' | 'cash' | 'bond' | 'property' | 'other'
 export type TransactionType = 'buy' | 'sell' | 'dividend' | 'transfer_in' | 'transfer_out' | 'adjustment'
 export type HoldingMember = 'husband' | 'wife' | 'joint'
 
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   crypto: 'Crypto',
+  stock_au: 'AU Stock',
+  stock_us: 'US Stock',
   stock: 'Stock',
   etf: 'ETF',
   cash: 'Cash',

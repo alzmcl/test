@@ -22,12 +22,15 @@ export function enrichHoldings(
   const quoteMap = new Map(quotes.map((q) => [q.code, q]))
 
   return holdings.map((h): HoldingWithPrice => {
-    const cost_basis_aud = h.units * h.avg_buy_price_aud
+    // Supabase returns NUMERIC columns as strings — coerce to number
+    const units = Number(h.units)
+    const avg_buy_price_aud = Number(h.avg_buy_price_aud)
+    const cost_basis_aud = units * avg_buy_price_aud
 
     // Cash: valued at face value, USD cash converted via FX rate
     if (h.asset_type === 'cash' || h.symbol === 'CASH' || h.symbol.startsWith('CASH_')) {
       const isUsd = h.price_currency === 'USD' || h.symbol === 'CASH_USD'
-      const market_value_aud = isUsd ? h.units / audUsdRate : h.units
+      const market_value_aud = isUsd ? units / audUsdRate : units
       const current_price_aud = isUsd ? 1 / audUsdRate : 1
       const unrealised_pnl_aud = market_value_aud - cost_basis_aud
       const unrealised_pnl_pct =
@@ -57,8 +60,8 @@ export function enrichHoldings(
       }
     }
 
-    const current_price_aud = toAud(quote.close, h.price_currency, audUsdRate)
-    const market_value_aud = h.units * current_price_aud
+    const current_price_aud = toAud(Number(quote.close), h.price_currency, audUsdRate)
+    const market_value_aud = units * current_price_aud
     const unrealised_pnl_aud = market_value_aud - cost_basis_aud
     const unrealised_pnl_pct =
       cost_basis_aud > 0 ? (unrealised_pnl_aud / cost_basis_aud) * 100 : 0

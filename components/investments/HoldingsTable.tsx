@@ -15,6 +15,8 @@ interface Props {
 
 const ASSET_TYPE_COLOURS: Record<string, string> = {
   crypto:   'text-yellow-400 bg-yellow-400/10',
+  stock_au: 'text-blue-400 bg-blue-400/10',
+  stock_us: 'text-indigo-400 bg-indigo-400/10',
   stock:    'text-blue-400 bg-blue-400/10',
   etf:      'text-teal bg-teal/10',
   cash:     'text-green-400 bg-green-400/10',

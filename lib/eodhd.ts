@@ -136,13 +136,13 @@ export const COMMON_SYMBOLS: {
   { symbol: 'IVV.AU',      name: 'iShares S&P 500 (IVV)',            asset_type: 'etf', price_currency: 'AUD' },
   { symbol: 'VDHG.AU',     name: 'Vanguard Diversified High Growth', asset_type: 'etf', price_currency: 'AUD' },
   // ASX stocks
-  { symbol: 'CBA.AU',      name: 'Commonwealth Bank',    asset_type: 'stock', price_currency: 'AUD' },
-  { symbol: 'BHP.AU',      name: 'BHP Group',            asset_type: 'stock', price_currency: 'AUD' },
-  { symbol: 'CSL.AU',      name: 'CSL Limited',          asset_type: 'stock', price_currency: 'AUD' },
+  { symbol: 'CBA.AU',      name: 'Commonwealth Bank',    asset_type: 'stock_au', price_currency: 'AUD' },
+  { symbol: 'BHP.AU',      name: 'BHP Group',            asset_type: 'stock_au', price_currency: 'AUD' },
+  { symbol: 'CSL.AU',      name: 'CSL Limited',          asset_type: 'stock_au', price_currency: 'AUD' },
   // US stocks
-  { symbol: 'AAPL.US',     name: 'Apple',                asset_type: 'stock', price_currency: 'USD' },
-  { symbol: 'MSFT.US',     name: 'Microsoft',            asset_type: 'stock', price_currency: 'USD' },
-  { symbol: 'NVDA.US',     name: 'NVIDIA',               asset_type: 'stock', price_currency: 'USD' },
+  { symbol: 'AAPL.US',     name: 'Apple',                asset_type: 'stock_us', price_currency: 'USD' },
+  { symbol: 'MSFT.US',     name: 'Microsoft',            asset_type: 'stock_us', price_currency: 'USD' },
+  { symbol: 'NVDA.US',     name: 'NVIDIA',               asset_type: 'stock_us', price_currency: 'USD' },
   // Cash
   { symbol: 'CASH',        name: 'Cash (AUD)',           asset_type: 'cash',  price_currency: 'AUD' },
 ]
