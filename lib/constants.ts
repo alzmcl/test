@@ -101,3 +101,33 @@ export const MONTH_SHORT = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
+
+// ─── Full settings object with DB fields (used as fallback) ──────────────────
+
+export const DEFAULT_SETTINGS_DB: import('@/types').HouseholdSettings = {
+  id: true,
+  ...DEFAULT_SETTINGS,
+  updated_at: new Date(0).toISOString(),
+  updated_by: null,
+}
+
+// ─── Budget default monthly amounts ──────────────────────────────────────────
+// Designed to add up to ~$15K/month (mortgage IO + all living costs)
+
+import type { BudgetCategory } from '@/types'
+
+export const BUDGET_DEFAULTS: Record<BudgetCategory, number> = {
+  mortgage_rent:  5_150,  // IO repayments
+  school_fees:    2_917,  // $35K ÷ 12
+  groceries:      1_500,
+  utilities:        400,
+  insurance:        500,
+  transport:        600,
+  dining_out:       800,
+  golf:             400,
+  travel:           833,  // $10K ÷ 12
+  kids:             500,
+  medical:          300,
+  subscriptions:    150,
+  other:            450,
+}

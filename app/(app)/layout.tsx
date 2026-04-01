@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Navigation from '@/components/Navigation'
+import ProfileSetup from '@/components/ProfileSetup'
 
 export default async function AppLayout({
   children,
@@ -8,20 +9,28 @@ export default async function AppLayout({
   children: React.ReactNode
 }) {
   const supabase = createServerSupabaseClient()
+
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect('/login')
-  }
+  if (!user) redirect('/login')
 
-  // Fetch profile for display name
+  // Check if profile exists; if not, show setup screen inline
   const { data: profile } = await supabase
     .from('profiles')
     .select('name, role')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
+
+  if (!profile) {
+    return (
+      <ProfileSetup
+        userId={user.id}
+        email={user.email ?? null}
+      />
+    )
+  }
 
   return (
     <div className="flex flex-col min-h-screen">

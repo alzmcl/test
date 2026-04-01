@@ -1,40 +1,34 @@
 import type { Metadata } from 'next'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { DEFAULT_SETTINGS_DB } from '@/lib/constants'
+import type { HouseholdSettings } from '@/types'
+import ModellerClient from '@/components/modeller/ModellerClient'
 
 export const metadata: Metadata = { title: 'Modeller — Retirement Planner' }
 
-// Modeller module — interactive sliders with bear/base/bull scenarios.
-// Full implementation in Step 4.
-export default function ModellerPage() {
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-semibold text-text-primary">Modeller</h1>
-        <p className="text-sm text-text-muted mt-1">
-          Retirement projection — bear / base / bull scenarios
-        </p>
-      </div>
+export default async function ModellerPage() {
+  const supabase = createServerSupabaseClient()
+  const now = new Date()
 
-      {/* Scenario columns placeholder */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {(['Bear', 'Base', 'Bull'] as const).map((label) => (
-          <div key={label} className="card space-y-3">
-            <span
-              className={`label ${
-                label === 'Bear'
-                  ? 'text-negative'
-                  : label === 'Base'
-                  ? 'text-gold'
-                  : 'text-positive'
-              }`}
-            >
-              {label} Case
-            </span>
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-4 bg-bg-raised rounded animate-pulse" />
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
+  const [{ data: settings }, { data: budgetEntries }] = await Promise.all([
+    supabase.from('household_settings').select('*').single(),
+    // Pull current month's budget total to optionally override living costs
+    supabase
+      .from('budget_entries')
+      .select('budgeted')
+      .eq('year', now.getFullYear())
+      .eq('month', now.getMonth() + 1),
+  ])
+
+  const budgetMonthlyTotal =
+    budgetEntries && budgetEntries.length > 0
+      ? budgetEntries.reduce((s, e) => s + (e.budgeted ?? 0), 0)
+      : null
+
+  return (
+    <ModellerClient
+      initialSettings={(settings ?? DEFAULT_SETTINGS_DB) as HouseholdSettings}
+      budgetMonthlyTotal={budgetMonthlyTotal}
+    />
   )
 }
