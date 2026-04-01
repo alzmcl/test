@@ -24,15 +24,17 @@ export function enrichHoldings(
   return holdings.map((h): HoldingWithPrice => {
     const cost_basis_aud = h.units * h.avg_buy_price_aud
 
-    // Cash: price is always 1 AUD per unit
-    if (h.symbol === 'CASH' || h.asset_type === 'cash') {
-      const market_value_aud = h.units
+    // Cash: valued at face value, USD cash converted via FX rate
+    if (h.asset_type === 'cash' || h.symbol === 'CASH' || h.symbol.startsWith('CASH_')) {
+      const isUsd = h.price_currency === 'USD' || h.symbol === 'CASH_USD'
+      const market_value_aud = isUsd ? h.units / audUsdRate : h.units
+      const current_price_aud = isUsd ? 1 / audUsdRate : 1
       const unrealised_pnl_aud = market_value_aud - cost_basis_aud
       const unrealised_pnl_pct =
         cost_basis_aud > 0 ? (unrealised_pnl_aud / cost_basis_aud) * 100 : 0
       return {
         ...h,
-        current_price_aud: 1,
+        current_price_aud,
         market_value_aud,
         cost_basis_aud,
         unrealised_pnl_aud,
@@ -92,7 +94,9 @@ export function computePortfolioSummary(
   enriched: HoldingWithPrice[]
 ): PortfolioSummaryData {
   const priced = enriched.filter((h) => h.market_value_aud !== null)
-  const prices_loaded = priced.length === enriched.filter((h) => h.symbol !== 'CASH' && h.asset_type !== 'cash').length
+  const isCashHolding = (h: HoldingWithPrice) =>
+    h.asset_type === 'cash' || h.symbol === 'CASH' || h.symbol.startsWith('CASH_')
+  const prices_loaded = priced.length === enriched.filter((h) => !isCashHolding(h)).length
 
   const total_market_value_aud = enriched.reduce(
     (sum, h) => sum + (h.market_value_aud ?? h.cost_basis_aud),

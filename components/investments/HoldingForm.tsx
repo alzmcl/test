@@ -46,8 +46,22 @@ export default function HoldingForm({ holding, onSave, onClose }: Props) {
     }))
   }
 
+  function applyCashCurrency(currency: 'AUD' | 'USD') {
+    setForm((f) => ({
+      ...f,
+      symbol: `CASH_${currency}`,
+      price_currency: currency,
+      name: f.name === 'Cash (AUD)' || f.name === 'Cash (USD)' || f.name === ''
+        ? `Cash (${currency})`
+        : f.name,
+    }))
+  }
+
+  const isCash = form.asset_type === 'cash' || form.symbol === 'CASH' || form.symbol.startsWith('CASH_')
+  const cashCurrency = (form.price_currency === 'USD' ? 'USD' : 'AUD') as 'AUD' | 'USD'
+
   async function lookupCurrentPrice() {
-    if (!form.symbol || form.symbol === 'CASH') return
+    if (!form.symbol || isCash) return
     setLookingUp(true)
     setLookupPrice(null)
     try {
@@ -71,7 +85,7 @@ export default function HoldingForm({ holding, onSave, onClose }: Props) {
     const { data: user } = await supabase.auth.getUser()
 
     const payload = {
-      symbol: form.symbol.trim().toUpperCase(),
+      symbol: isCash ? `CASH_${form.price_currency}` : form.symbol.trim().toUpperCase(),
       name: form.name.trim(),
       asset_type: form.asset_type,
       units: Number(form.units),
@@ -111,8 +125,6 @@ export default function HoldingForm({ holding, onSave, onClose }: Props) {
     onSave(result.data as PortfolioHolding)
   }
 
-  const isCash = form.asset_type === 'cash' || form.symbol === 'CASH'
-
   return (
     /* Backdrop */
     <div
@@ -131,142 +143,215 @@ export default function HoldingForm({ holding, onSave, onClose }: Props) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {/* Common symbol picker */}
+
+          {/* Asset type selector — always shown */}
           <div className="space-y-1">
-            <label className="label">Quick-pick symbol</label>
+            <label className="label">Type *</label>
             <select
               className="input-field w-full"
-              value=""
-              onChange={(e) => applyCommonSymbol(e.target.value)}
+              value={form.asset_type}
+              onChange={(e) => {
+                const newType = e.target.value as AssetType
+                if (newType === 'cash') {
+                  setForm((f) => ({
+                    ...f,
+                    asset_type: 'cash',
+                    symbol: 'CASH_AUD',
+                    price_currency: 'AUD',
+                    name: f.name || 'Cash (AUD)',
+                    avg_buy_price_aud: 0,
+                  }))
+                } else {
+                  setForm((f) => ({
+                    ...f,
+                    asset_type: newType,
+                    symbol: f.symbol.startsWith('CASH_') ? '' : f.symbol,
+                    name: f.name === 'Cash (AUD)' || f.name === 'Cash (USD)' ? '' : f.name,
+                  }))
+                }
+              }}
             >
-              <option value="">— select a common asset —</option>
-              {COMMON_SYMBOLS.map((s) => (
-                <option key={s.symbol} value={s.symbol}>
-                  {s.symbol} — {s.name}
-                </option>
+              {Object.entries(ASSET_TYPE_LABELS).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
               ))}
             </select>
           </div>
 
-          {/* Symbol + lookup */}
-          <div className="space-y-1">
-            <label className="label">EODHD Symbol *</label>
-            <div className="flex gap-2">
-              <input
-                required
-                className="input-field flex-1"
-                placeholder="e.g. BTC-USD.CC  VAS.AU  AAPL.US"
-                value={form.symbol}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    symbol: e.target.value,
-                    price_currency: nativeCurrencyForSymbol(e.target.value),
-                  }))
-                }
-              />
-              <button
-                type="button"
-                onClick={lookupCurrentPrice}
-                disabled={lookingUp || !form.symbol || isCash}
-                className="btn-ghost px-3 text-xs border border-bg-border shrink-0"
-              >
-                {lookingUp ? '…' : 'Lookup'}
-              </button>
-            </div>
-            {lookupPrice !== null && (
-              <p className="text-xs text-teal">
-                Current price: {form.price_currency} {lookupPrice.toLocaleString()}
-              </p>
-            )}
-          </div>
-
-          {/* Name */}
-          <div className="space-y-1">
-            <label className="label">Name *</label>
-            <input
-              required
-              className="input-field w-full"
-              placeholder="e.g. Bitcoin, Vanguard Aus Shares"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            />
-          </div>
-
-          {/* Asset type + currency row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="label">Type *</label>
-              <select
-                className="input-field w-full"
-                value={form.asset_type}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, asset_type: e.target.value as AssetType }))
-                }
-              >
-                {Object.entries(ASSET_TYPE_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="label">Price Currency</label>
-              <select
-                className="input-field w-full"
-                value={form.price_currency}
-                onChange={(e) => setForm((f) => ({ ...f, price_currency: e.target.value }))}
-              >
-                {['AUD', 'USD', 'GBP', 'EUR', 'CAD', 'JPY', 'HKD'].map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Units + avg buy price row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="label">{isCash ? 'Amount (AUD) *' : 'Units *'}</label>
-              <input
-                required
-                type="number"
-                step="any"
-                min="0"
-                className="input-field w-full"
-                placeholder="0"
-                value={form.units || ''}
-                onChange={(e) => setForm((f) => ({ ...f, units: parseFloat(e.target.value) || 0 }))}
-              />
-            </div>
-            {!isCash && (
+          {isCash ? (
+            /* ── Cash simplified form ── */
+            <>
+              {/* Currency toggle */}
               <div className="space-y-1">
-                <label className="label">Avg Buy Price (AUD) *</label>
+                <label className="label">Currency</label>
+                <div className="flex rounded-lg border border-bg-border overflow-hidden text-sm">
+                  {(['AUD', 'USD'] as const).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => applyCashCurrency(c)}
+                      className={`flex-1 py-2 text-sm transition-colors ${
+                        cashCurrency === c ? 'bg-navy text-gold' : 'text-text-muted hover:bg-bg-raised'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Amount */}
+              <div className="space-y-1">
+                <label className="label">Amount ({cashCurrency}) *</label>
                 <input
                   required
                   type="number"
                   step="any"
                   min="0"
                   className="input-field w-full"
-                  placeholder="0.00"
-                  value={form.avg_buy_price_aud || ''}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, avg_buy_price_aud: parseFloat(e.target.value) || 0 }))
-                  }
+                  placeholder="0"
+                  value={form.units || ''}
+                  onChange={(e) => setForm((f) => ({ ...f, units: parseFloat(e.target.value) || 0 }))}
                 />
-                {lookupPrice !== null && (
-                  <button
-                    type="button"
-                    className="text-xs text-gold underline"
-                    onClick={() => setForm((f) => ({ ...f, avg_buy_price_aud: lookupPrice }))}
-                  >
-                    Use current price
-                  </button>
+                {cashCurrency === 'USD' && (
+                  <p className="text-xs text-text-subtle">Converted to AUD at settlement using live FX rate</p>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Cost basis preview */}
+              {/* Name */}
+              <div className="space-y-1">
+                <label className="label">Name *</label>
+                <input
+                  required
+                  className="input-field w-full"
+                  placeholder="e.g. Cash (AUD)"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+            </>
+          ) : (
+            /* ── Standard asset form ── */
+            <>
+              {/* Common symbol picker */}
+              <div className="space-y-1">
+                <label className="label">Quick-pick symbol</label>
+                <select
+                  className="input-field w-full"
+                  value=""
+                  onChange={(e) => applyCommonSymbol(e.target.value)}
+                >
+                  <option value="">— select a common asset —</option>
+                  {COMMON_SYMBOLS.map((s) => (
+                    <option key={s.symbol} value={s.symbol}>
+                      {s.symbol} — {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Symbol + lookup */}
+              <div className="space-y-1">
+                <label className="label">EODHD Symbol *</label>
+                <div className="flex gap-2">
+                  <input
+                    required
+                    className="input-field flex-1"
+                    placeholder="e.g. BTC-USD.CC  VAS.AU  AAPL.US"
+                    value={form.symbol}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        symbol: e.target.value,
+                        price_currency: nativeCurrencyForSymbol(e.target.value),
+                      }))
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={lookupCurrentPrice}
+                    disabled={lookingUp || !form.symbol}
+                    className="btn-ghost px-3 text-xs border border-bg-border shrink-0"
+                  >
+                    {lookingUp ? '…' : 'Lookup'}
+                  </button>
+                </div>
+                {lookupPrice !== null && (
+                  <p className="text-xs text-teal">
+                    Current price: {form.price_currency} {lookupPrice.toLocaleString()}
+                  </p>
+                )}
+              </div>
+
+              {/* Name */}
+              <div className="space-y-1">
+                <label className="label">Name *</label>
+                <input
+                  required
+                  className="input-field w-full"
+                  placeholder="e.g. Bitcoin, Vanguard Aus Shares"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+
+              {/* Currency */}
+              <div className="space-y-1">
+                <label className="label">Price Currency</label>
+                <select
+                  className="input-field w-full"
+                  value={form.price_currency}
+                  onChange={(e) => setForm((f) => ({ ...f, price_currency: e.target.value }))}
+                >
+                  {['AUD', 'USD', 'GBP', 'EUR', 'CAD', 'JPY', 'HKD'].map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Units + avg buy price row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="label">Units *</label>
+                  <input
+                    required
+                    type="number"
+                    step="any"
+                    min="0"
+                    className="input-field w-full"
+                    placeholder="0"
+                    value={form.units || ''}
+                    onChange={(e) => setForm((f) => ({ ...f, units: parseFloat(e.target.value) || 0 }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="label">Avg Buy Price (AUD) *</label>
+                  <input
+                    required
+                    type="number"
+                    step="any"
+                    min="0"
+                    className="input-field w-full"
+                    placeholder="0.00"
+                    value={form.avg_buy_price_aud || ''}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, avg_buy_price_aud: parseFloat(e.target.value) || 0 }))
+                    }
+                  />
+                  {lookupPrice !== null && (
+                    <button
+                      type="button"
+                      className="text-xs text-gold underline"
+                      onClick={() => setForm((f) => ({ ...f, avg_buy_price_aud: lookupPrice }))}
+                    >
+                      Use current price
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Cost basis preview — only for non-cash */}
           {!isCash && form.units > 0 && form.avg_buy_price_aud > 0 && (
             <p className="text-xs text-text-muted">
               Cost basis:{' '}
