@@ -67,10 +67,10 @@ export default function HoldingForm({ holding, onSave, onClose }: Props) {
     setLookingUp(true)
     setLookupPrice(null)
     try {
-      const res = await fetch(`/api/asset-price?symbols=${encodeURIComponent(form.symbol)}`)
+      const res = await fetch(`/api/asset-lookup?symbol=${encodeURIComponent(form.symbol)}`)
       const data = await res.json()
-      const quote = data?.quotes?.[0]
-      if (quote) setLookupPrice(quote.price)
+      if (data?.price != null) setLookupPrice(data.price)
+      if (data?.name) setForm((f) => ({ ...f, name: f.name || data.name }))
     } catch {
       // silently ignore
     } finally {
