@@ -1,18 +1,13 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-/** Browser / React client (anon key, RLS applies) */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { createBrowserClient } from '@supabase/ssr'
 
 /**
- * Server-side helper — import only in Server Components / Route Handlers.
- * Falls back to the anon client if SERVICE_ROLE_KEY is not set.
+ * Browser / Client Component Supabase client.
+ * Uses @supabase/ssr so cookies are handled automatically.
+ * Call this inside Client Components or browser-side hooks.
  */
-export function createServerClient() {
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  return createClient(supabaseUrl, serviceKey ?? supabaseAnonKey, {
-    auth: { persistSession: false },
-  });
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 }

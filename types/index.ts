@@ -1,118 +1,197 @@
-// ─── Price feed ────────────────────────────────────────────────────────────
+// ─── User & Profile ──────────────────────────────────────────────────────────
 
-export interface OHLCVDay {
-  date: number;   // Unix ms timestamp
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
+export type UserRole = 'husband' | 'wife'
+
+export interface Profile {
+  id: string
+  name: string
+  role: UserRole
+  created_at: string
 }
 
-/** Lightweight version returned by CoinGecko /market_chart (no OHLCV) */
-export interface PriceDay {
-  date: number;   // Unix ms timestamp
-  price: number;
+// ─── Household Settings ───────────────────────────────────────────────────────
+// Mirrors the household_settings DB table (singleton row).
+
+export interface HouseholdSettings {
+  id: boolean
+  // Ages
+  age_husband: number
+  age_wife: number
+  target_retirement_age: number
+  // SMSF
+  smsf_cash_investments: number
+  smsf_btc_holdings: number
+  // Mortgage
+  mortgage_balance: number
+  mortgage_rate_pct: number
+  mortgage_monthly_io: number
+  mortgage_monthly_pi: number
+  use_io_repayments: boolean
+  // Offset
+  offset_balance: number
+  // Property
+  home_value: number
+  downsize_year: number
+  target_new_home_price: number
+  downsizer_contribution: number
+  // Living costs
+  monthly_living_costs: number
+  school_fees_annual: number
+  school_fees_years_remaining: number
+  // Super
+  annual_super_concessional: number
+  // FX
+  aud_usd_rate: number
+  // Bear scenario
+  bear_gross_income: number
+  bear_smsf_cagr_pct: number
+  bear_btc_price_usd: number
+  // Base scenario
+  base_gross_income: number
+  base_smsf_cagr_pct: number
+  base_btc_price_usd: number
+  // Bull scenario
+  bull_gross_income: number
+  bull_smsf_cagr_pct: number
+  bull_btc_price_usd: number
+  // Meta
+  updated_at: string
+  updated_by: string | null
 }
 
-// ─── Regime detection ──────────────────────────────────────────────────────
+// ─── Manual Balances ─────────────────────────────────────────────────────────
 
-export type Regime = 'trending' | 'choppy' | 'unknown';
-
-export interface RegimeDay extends PriceDay {
-  regime: Regime;
-  /** ADX-proxy value (0–100). Higher = more trending. */
-  adxProxy: number;
-  /** Rolling 14-day return volatility (annualised) */
-  volatility: number;
+export interface ManualBalance {
+  id: string
+  smsf_balance: number
+  offset_balance: number
+  mortgage_balance: number
+  notes: string | null
+  recorded_at: string
+  recorded_by: string | null
 }
 
-// ─── Backtester ────────────────────────────────────────────────────────────
+// ─── Budget ──────────────────────────────────────────────────────────────────
 
-export interface BacktestConfig {
-  /** % dip from rolling high to trigger entry (e.g. 0.04 = 4%) */
-  entryDipPct: number;
-  /** % drop from position high to trigger trailing stop (e.g. 0.06 = 6%) */
-  trailingStopPct: number;
-  /** % gain from entry before trailing stop activates (e.g. 0.05 = 5%) */
-  trailingStopActivationPct: number;
-  /** % dip from last exit price required to re-enter (e.g. 0.03 = 3%) */
-  reEntryDipPct: number;
-  /** Minimum bars to wait before re-entry after a stop-out */
-  reEntryCooldownBars: number;
-  /** Only trade when regime === 'choppy'. Set false to trade all regimes. */
-  regimeFilter: boolean;
-  /** Rolling window (days) used for local-high calculation */
-  lookbackDays: number;
-  /** Exchange fee per side (e.g. 0.001 = 0.1%) */
-  feePct: number;
-  /** ADX rolling window in days */
-  regimeAdxPeriod: number;
-  /** ADX-proxy threshold above which market is 'trending' */
-  regimeAdxThreshold: number;
-  /** Portfolio starting size in USD */
-  portfolioSize: number;
+export type BudgetCategory =
+  | 'mortgage_rent'
+  | 'school_fees'
+  | 'groceries'
+  | 'utilities'
+  | 'insurance'
+  | 'transport'
+  | 'dining_out'
+  | 'golf'
+  | 'travel'
+  | 'kids'
+  | 'medical'
+  | 'subscriptions'
+  | 'other'
+
+export const BUDGET_CATEGORY_LABELS: Record<BudgetCategory, string> = {
+  mortgage_rent: 'Mortgage / Rent',
+  school_fees: 'School Fees',
+  groceries: 'Groceries',
+  utilities: 'Utilities',
+  insurance: 'Insurance',
+  transport: 'Transport',
+  dining_out: 'Dining Out',
+  golf: 'Golf',
+  travel: 'Travel',
+  kids: 'Kids',
+  medical: 'Medical',
+  subscriptions: 'Subscriptions',
+  other: 'Other',
 }
 
-export const DEFAULT_BACKTEST_CONFIG: BacktestConfig = {
-  entryDipPct: 0.04,
-  trailingStopPct: 0.06,
-  trailingStopActivationPct: 0.05,
-  reEntryDipPct: 0.03,
-  reEntryCooldownBars: 2,
-  regimeFilter: true,
-  lookbackDays: 14,
-  feePct: 0.001,
-  regimeAdxPeriod: 14,
-  regimeAdxThreshold: 25,
-  portfolioSize: 10000,
-};
+export const BUDGET_CATEGORIES: BudgetCategory[] = [
+  'mortgage_rent',
+  'school_fees',
+  'groceries',
+  'utilities',
+  'insurance',
+  'transport',
+  'dining_out',
+  'golf',
+  'travel',
+  'kids',
+  'medical',
+  'subscriptions',
+  'other',
+]
 
-export type TradeSide = 'buy' | 'sell';
-export type TradeReason = 'entry_dip' | 'trailing_stop' | 'end_of_data' | 're_entry_dip';
-
-export interface Trade {
-  entryDate: number;
-  entryPrice: number;
-  exitDate: number | null;
-  exitPrice: number | null;
-  exitReason: TradeReason | null;
-  pnlPct: number | null;          // after fees
-  regime: Regime;
+export interface BudgetEntry {
+  id: string
+  year: number
+  month: number
+  category: BudgetCategory
+  budgeted: number
+  actual: number | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  updated_by: string | null
 }
 
-export interface BacktestResult {
-  trades: Trade[];
-  equityCurve: { date: number; equity: number }[];
-  stats: BacktestStats;
+// ─── Super Contributions ─────────────────────────────────────────────────────
+
+export type SuperMember = 'husband' | 'wife'
+
+export interface SuperContribution {
+  id: string
+  financial_year: string  // e.g. '2025-26'
+  member: SuperMember
+  amount: number
+  contribution_date: string
+  notes: string | null
+  created_at: string
+  updated_by: string | null
 }
 
-export interface BacktestStats {
-  totalTrades: number;
-  winRate: number;          // 0–1
-  avgWinPct: number;
-  avgLossPct: number;
-  totalReturnPct: number;
-  maxDrawdownPct: number;
-  sharpeProxy: number;      // annualised Sharpe approximation
-  tradesInTrending: number;
-  tradesInChoppy: number;
-  portfolioFinalValue: number;
+// ─── Modeller ────────────────────────────────────────────────────────────────
+
+export type Scenario = 'bear' | 'base' | 'bull'
+
+export interface ScenarioInputs {
+  gross_income: number
+  smsf_cagr_pct: number
+  btc_price_usd: number
 }
 
-// ─── Supabase DB rows ───────────────────────────────────────────────────────
-
-export interface DbPriceRow {
-  id: number;
-  date: string;    // ISO date 'YYYY-MM-DD'
-  close: number;
-  created_at: string;
+export interface ModellerResult {
+  scenario: Scenario
+  years_to_retirement: number
+  // SMSF projection
+  smsf_cash_at_retirement: number
+  smsf_btc_value_aud: number
+  smsf_contributions_compounded: number
+  smsf_total_at_retirement: number
+  // Property / downsize
+  offset_at_sale: number
+  net_mortgage_at_sale: number
+  net_sale_proceeds: number
+  cash_reserve: number
+  // Post-downsize (after downsizer contribution invested in SMSF)
+  smsf_post_downsize: number
+  // Retirement income (4% rule, tax-free from 60)
+  annual_retirement_income: number
+  monthly_retirement_income: number
+  // Current cashflow
+  monthly_gross_income: number
+  monthly_net_income: number
+  monthly_mortgage: number
+  monthly_school_fees: number
+  monthly_living_costs: number
+  monthly_expenses: number
+  monthly_cashflow: number
+  // Offset runway (months) — null if cashflow is positive
+  offset_runway_months: number | null
 }
 
-export interface DbBacktestRun {
-  id: string;       // uuid
-  created_at: string;
-  config: BacktestConfig;
-  stats: BacktestStats;
-  trades: Trade[];
+// ─── Dashboard ───────────────────────────────────────────────────────────────
+
+export interface BtcPriceData {
+  price_usd: number
+  price_aud: number
+  change_24h_pct: number
 }

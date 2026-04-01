@@ -1,20 +1,27 @@
-import type { Metadata } from 'next';
-import './globals.css';
+import type { Metadata, Viewport } from 'next'
+import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'BTC Swing Trader',
-  description:
-    'Regime-filtered Bitcoin swing trading backtester — entry dip, trailing stop, re-entry.',
-};
+  title: 'Retirement Planner',
+  description: 'Personal retirement planning — modeller, dashboard & budget tracker.',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#0A1628',
+}
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" className="dark">
+      <body className="min-h-screen bg-bg-base text-text-primary antialiased">
+        {children}
+      </body>
     </html>
-  );
+  )
 }

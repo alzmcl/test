@@ -1,5 +1,6 @@
-import BTCSwingAnalyzer from '@/components/BTCSwingAnalyzer';
+import { redirect } from 'next/navigation'
 
-export default function Home() {
-  return <BTCSwingAnalyzer />;
+// Root page — middleware handles auth redirect, but this catches direct visits.
+export default function RootPage() {
+  redirect('/dashboard')
 }
